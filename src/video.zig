@@ -1688,7 +1688,7 @@ pub const Window = packed struct {
                 .kmsdrm_gbm_device = if (value.get(c.SDL_PROP_WINDOW_KMSDRM_GBM_DEVICE_POINTER)) |val| .{ .value = val.pointer } else null,
                 .cocoa_window = if (value.get(c.SDL_PROP_WINDOW_COCOA_WINDOW_POINTER)) |val| .{ .value = val.pointer } else null,
                 .cocoa_metal_view_tag = if (value.get(c.SDL_PROP_WINDOW_COCOA_METAL_VIEW_TAG_NUMBER)) |val| val.number else null,
-                .openvr_overlay_id = if (value.get(c.SDL_PROP_WINDOW_OPENVR_OVERLAY_ID)) |val| val.number else null,
+                .openvr_overlay_id = if (value.get(c.SDL_PROP_WINDOW_OPENVR_OVERLAY_ID_NUMBER)) |val| val.number else null,
                 .vivante_display = if (value.get(c.SDL_PROP_WINDOW_VIVANTE_DISPLAY_POINTER)) |val| .{ .value = val.pointer } else null,
                 .vivante_window = if (value.get(c.SDL_PROP_WINDOW_VIVANTE_WINDOW_POINTER)) |val| .{ .value = val.pointer } else null,
                 .vivante_surface = if (value.get(c.SDL_PROP_WINDOW_VIVANTE_SURFACE_POINTER)) |val| .{ .value = val.pointer } else null,

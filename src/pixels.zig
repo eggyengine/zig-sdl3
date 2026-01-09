@@ -1118,10 +1118,9 @@ pub const Format = enum(c.SDL_PixelFormat) {
     pub fn getBitsPerPixel(
         self: Format,
     ) u8 {
-        const ret = c.SDL_BITSPERPIXEL(
-            @as(c_int, @bitCast(@intFromEnum(self))),
-        );
-        return @intCast(ret);
+
+        // Translate C break macro so do it manually.
+        return if (self.is4cc()) 0 else @intCast((@intFromEnum(self) >> 8) & 0xff);
     }
 
     /// Get the bytes per pixel of the format.
@@ -1143,10 +1142,9 @@ pub const Format = enum(c.SDL_PixelFormat) {
     pub fn getBytesPerPixel(
         self: Format,
     ) u8 {
-        const ret = c.SDL_BYTESPERPIXEL(
-            @as(c_int, @bitCast(@intFromEnum(self))),
-        );
-        return @intCast(ret);
+
+        // Ported manually because translate C not working properly for this macro.
+        return if (self.is4cc()) (if (self == .fourcc_yuy2 or self == .fourcc_uyvy or self == .fourcc_yvyu or self == .fourcc_p010) 2 else 1) else @intCast(@intFromEnum(self) & 0xff);
     }
 
     /// Create a `pixels.Details` structure corresponding to a pixel format.
