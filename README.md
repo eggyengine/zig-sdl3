@@ -9,10 +9,10 @@ A lightweight wrapper to zig-ify SDL3.
 > However, most of the library is stable and usable!
 > If you're a hobbyist, you are recommended to try it out so that I can get early feedback for bugs and changes!
 >
-> See the [milestones](https://github.com/Gota7/zig-sdl3/milestones) for more details on progress.
+> See the [milestones](https://codeberg.org/7Games/zig-sdl3/milestones) for more details on progress.
 
 # Documentation
-[https://gota7.github.io/zig-sdl3/](https://gota7.github.io/zig-sdl3/)
+https://7games.codeberg.page/zig-sdl3/@docs
 
 # About
 
@@ -27,11 +27,11 @@ The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
 ```sh
-zig fetch --save git+https://github.com/Gota7/zig-sdl3#v0.1.5
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.1.6
 ```
 * For in progress updates (nightly):
 ```sh
-zig fetch --save git+https://github.com/Gota7/zig-sdl3#master
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#master
 ```
 
 Then add zig-sdl3 as a dependency and import its modules and artifact in your `build.zig`:
@@ -180,10 +180,7 @@ My free time is limited, but trust me my top priority is getting this out soon!
 
 ## GPU Examples?
 
-I will try and get these done before 1.0.0.
-The original goal was to use zig shaders, but unfortunately the current zig release does not support the ability to run every example.
-The examples using zig shaders have been moved to https://github.com/Gota7/zig-sdl3-gpu-examples.
-Depending on when zig 15.0.0 releases, I may or may not implement all the GPU examples in HLSL.
+There is progress on the [shadercross](https://codeberg.org/7Games/zig-sdl3/src/branch/shadercross) branch at the moment.
 
 ## HLSL Examples?
 
@@ -203,4 +200,4 @@ note: unable to create symlink from 'Xcode\macOS\SDL3.framework\Versions\Current
 ```
 
 See this:
-https://github.com/Gota7/zig-sdl3/issues/21
+https://codeberg.org/7Games/zig-sdl3/issues/21
