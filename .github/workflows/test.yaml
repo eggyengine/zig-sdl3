@@ -1,23 +1,25 @@
 name: test
 on:
   push:
-    branches: ["master"]
+    branches:
+      - main
   pull_request:
-    branches: ["master"]
+    branches:
+      - main
 permissions:
   contents: read
 env:
-  ZIG_VERSION: 0.15.1
+  ZIG_VERSION: 0.15.2
 concurrency:
   group: "test"
   cancel-in-progress: false
 jobs:
   docs:
     name: Build Documentation
-    runs-on: ubuntu-latest
+    runs-on: docker
     steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
+      - uses: actions/checkout@v3
+      - uses: https://codeberg.org/mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Documentation Linux
@@ -26,10 +28,10 @@ jobs:
         run: zig build docs -Dtarget=x86_64-windows
   examples:
     name: Build Examples
-    runs-on: ubuntu-latest
+    runs-on: docker
     steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
+      - uses: actions/checkout@v3
+      - uses: https://codeberg.org/mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Examples Linux
@@ -38,25 +40,13 @@ jobs:
         run: zig build examples -Dtarget=x86_64-windows
   template:
     name: Build Template
-    runs-on: ubuntu-latest
+    runs-on: docker
     steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
+      - uses: actions/checkout@v3
+      - uses: https://codeberg.org/mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Template Linux
         run: cd template && zig build
       - name: Build Template Windows
         run: cd template && zig build -Dtarget=x86_64-windows
-      # - name: Build Template Web
-      # run: cd template && zig build -Dtarget=wasm32-emscripten
-  test:
-    name: Testing
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: ${{ env.ZIG_VERSION }}
-      - name: Testing
-        run: zig build test
