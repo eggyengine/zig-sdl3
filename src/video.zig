@@ -2913,7 +2913,7 @@ pub const Window = packed struct {
     ) !void {
         const Cb = struct {
             pub fn run(win_c: ?*c.SDL_Window, area_c: [*c]const c.SDL_Point, user_data_c: ?*anyopaque) callconv(.c) c.SDL_HitTestResult {
-                return @intFromEnum(callback.?(.{ .value = win_c.? }, rect.IPoint.fromSdl(area_c), @ptrCast(@alignCast(user_data_c))));
+                return @intFromEnum(callback.?(.{ .value = win_c.? }, rect.IPoint.fromSdl(area_c.*), @ptrCast(@alignCast(user_data_c))));
             }
         };
         return errors.wrapCallBool(c.SDL_SetWindowHitTest(self.value, if (callback != null) Cb.run else null, user_data));
