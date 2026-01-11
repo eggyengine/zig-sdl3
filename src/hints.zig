@@ -210,6 +210,7 @@ pub const Type = enum {
     mouse_double_click_radius,
     mouse_double_click_time,
     mouse_default_system_cursor,
+    mouse_dpi_scale_cursors,
     mouse_emulate_warp_with_relative,
     mouse_focus_clickthrough,
     mouse_normal_speed_scale,
@@ -460,6 +461,7 @@ pub const Type = enum {
             .mouse_double_click_radius => c.SDL_HINT_MOUSE_DOUBLE_CLICK_RADIUS,
             .mouse_double_click_time => c.SDL_HINT_MOUSE_DOUBLE_CLICK_TIME,
             .mouse_default_system_cursor => c.SDL_HINT_MOUSE_DEFAULT_SYSTEM_CURSOR,
+            .mouse_dpi_scale_cursors => c.SDL_HINT_MOUSE_DPI_SCALE_CURSORS,
             .mouse_emulate_warp_with_relative => c.SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE,
             .mouse_focus_clickthrough => c.SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,
             .mouse_normal_speed_scale => c.SDL_HINT_MOUSE_NORMAL_SPEED_SCALE,
@@ -600,7 +602,7 @@ pub fn addCallback(
             old_value_c: [*c]const u8,
             new_value_c: [*c]const u8,
         ) callconv(.c) void {
-            callback(@alignCast(@ptrCast(user_data_c)), std.mem.span(name_c), if (old_value_c) |val| std.mem.span(val) else null, if (new_value_c) |val| std.mem.span(val) else null);
+            callback(@ptrCast(@alignCast(user_data_c)), std.mem.span(name_c), if (old_value_c) |val| std.mem.span(val) else null, if (new_value_c) |val| std.mem.span(val) else null);
         }
     };
     const ret = c.SDL_AddHintCallback(

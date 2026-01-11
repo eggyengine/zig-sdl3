@@ -27,6 +27,39 @@ pub fn HitTest(comptime UserData: type) type {
     ) HitTestResult;
 }
 
+/// Window progress state.
+///
+/// ## Version
+/// This enum is available since SDL 3.2.8.
+pub const ProgressState = enum(c.SDL_ProgressState) {
+    /// The progress bar is shown in a indeterminate state.
+    indeterminate,
+    /// The progress bar is shown in a normal state.
+    normal,
+    /// The progress bar is shown in a paused state.
+    paused,
+    /// The progress bar is shown in a state indicating the application had an error.
+    err,
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(value: c.SDL_ProgressState) !?ProgressState {
+        if (value == c.SDL_PROGRESS_STATE_INVALID) {
+            errors.callErrorCallback();
+            return error.SdlError;
+        }
+        if (value == c.SDL_PROGRESS_STATE_NONE)
+            return null;
+        return @enumFromInt(value);
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(self: ?ProgressState) c.SDL_ProgressState {
+        if (self) |val|
+            return @intFromEnum(val);
+        return c.SDL_PROGRESS_STATE_NONE;
+    }
+};
+
 /// System theme.
 ///
 /// ## Version
@@ -2588,6 +2621,44 @@ pub const Window = packed struct {
         return ret;
     }
 
+    /// Get the state of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window to get the current progress state from.
+    ///
+    /// ## Return Value
+    /// Returns the progress state.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getWindowProgressState(
+        self: Window,
+    ) !?ProgressState {
+        return ProgressState.fromSdl(c.SDL_GetWindowProgressState(self.value));
+    }
+
+    /// Get the value of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window to get the current progress value from.
+    ///
+    /// ## Return Value
+    /// Returns the progress value in the range of `[0, 1]`.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getWindowProgressValue(
+        self: Window,
+    ) !f32 {
+        return errors.wrapCall(f32, c.SDL_GetWindowProgressValue(self.value), -1);
+    }
+
     /// Hide a window.
     ///
     /// ## Function Parameters
@@ -3184,6 +3255,42 @@ pub const Window = packed struct {
             y.toSdl(),
         );
         return errors.wrapCallBool(ret);
+    }
+
+    /// Sets the state of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window whose progress state is to be modified.
+    /// * `state`: The progress state, `null` stops displaying the progress bar.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setProgressState(
+        self: Window,
+        state: ?ProgressState,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetWindowProgressState(self.value, ProgressState.toSdl(state)));
+    }
+
+    /// Sets the value of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window whose progress value is to be modified.
+    /// * `value`: The progress value in the range of `[0, 1]`. If the value is outside the valid range, it gets clamped
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setProgressValue(
+        self: Window,
+        value: f32,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetWindowProgressValue(self.value, value));
     }
 
     /// Set the user-resizable state of a window.

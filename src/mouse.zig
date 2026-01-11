@@ -82,6 +82,22 @@ pub const ButtonFlags = struct {
     }
 };
 
+/// Animated cursor frame info.
+///
+/// ## Version
+/// This struct is available since SDL 3.4.0.
+pub const CursorFrameInfo = extern struct {
+    /// The surface data for this frame
+    surface: surface.Surface,
+    /// The frame duration in milliseconds (a duration of 0 is infinite).
+    duration: u32,
+
+    // Alignment checks.
+    comptime {
+        errors.assertStructsEqual(CursorFrameInfo, c.SDL_CursorFrameInfo);
+    }
+};
+
 /// This is a unique ID for a mouse for the time it is connected to the system,
 /// and is never reused for the lifetime of the application.
 ///
@@ -289,6 +305,50 @@ pub const Cursor = packed struct {
             mask,
             @intCast(width),
             @intCast(height),
+            @intCast(hot_x),
+            @intCast(hot_y),
+        )) };
+    }
+
+    /// Create an animated color cursor.
+    ///
+    /// ## Function Parameters
+    /// * `frames`: A slice of cursor images composing the animation.
+    /// * `hot_x`: The x position of the cursor hot spot.
+    /// * `hot_y`: The y position of the cursor hot spot.
+    ///
+    /// ## Return Value
+    /// Returns the new cursor.
+    ///
+    /// ## Remarks
+    /// Animated cursors are composed of a sequential array of frames, specified as surfaces and durations in an array of `CursorFrameInfo` structs.
+    /// The hot spot coordinates are universal to all frames, and all frames must have the same dimensions.
+    ///
+    /// Frame durations are specified in milliseconds.
+    /// A duration of `0` implies an infinite frame time, and the animation will stop on that frame.
+    /// To create a one-shot animation, set the duration of the last frame in the sequence to `0`.
+    ///
+    /// If this function is passed surfaces with alternate representations added with `Surface.addAlternateImage()`,
+    /// the surfaces will be interpreted as the content to be used for 100% display scale, and the alternate representations will be used for high DPI situations.
+    /// For example, if the original surfaces are 32x32, then on a 2x macOS display or 200% display scale on Windows, a 64x64 version of the image will be used, if available.
+    /// If a matching version of the image isn't available, the closest larger size image will be downscaled to the appropriate size and be used instead, if available.
+    /// Otherwise, the closest smaller image will be upscaled and be used instead.
+    ///
+    /// If the underlying platform does not support animated cursors, this function will fall back to creating a static color cursor using the first frame in the sequence.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initAnimated(
+        frames: []CursorFrameInfo,
+        hot_x: usize,
+        hot_y: usize,
+    ) !Cursor {
+        return .{ .value = try errors.wrapCallNull(*c.SDL_Cursor, c.SDL_CreateAnimatedCursor(
+            @ptrCast(frames.ptr),
+            @intCast(frames.len),
             @intCast(hot_x),
             @intCast(hot_y),
         )) };
