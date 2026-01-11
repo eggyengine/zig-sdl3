@@ -100,6 +100,8 @@ pub fn FramerateCapper(
     };
 }
 
+const logger = std.log.scoped(.sdl3);
+
 /// An example function to handle errors from SDL in a debug print.
 ///
 /// ## Function Parameters
@@ -128,9 +130,9 @@ pub fn sdlErrZigLog(
     err: ?[]const u8,
 ) void {
     if (err) |val| {
-        std.log.err("SDL3: [Error:General] {s}", .{val});
+        logger.err("[Error:General] {s}", .{val});
     } else {
-        std.log.err("SDL3: [Error:Unknown]", .{});
+        logger.err("[Error:Unknown]", .{});
     }
 }
 
@@ -217,28 +219,28 @@ pub fn sdlLogZigLog(
     } else "Unknown";
     const pri = priority orelse .info;
     if (category_str) |val| {
-        const fmt = "SDL3: [{s}:{s}] {s}";
+        const fmt = "[{s}:{s}] {s}";
         switch (pri) {
-            .err, .critical => std.log.err(fmt, .{ val, priority_str, message }),
-            .warn => std.log.warn(fmt, .{ val, priority_str, message }),
-            .info => std.log.info(fmt, .{ val, priority_str, message }),
-            else => std.log.debug(fmt, .{ val, priority_str, message }),
+            .err, .critical => logger.err(fmt, .{ val, priority_str, message }),
+            .warn => logger.warn(fmt, .{ val, priority_str, message }),
+            .info => logger.info(fmt, .{ val, priority_str, message }),
+            else => logger.debug(fmt, .{ val, priority_str, message }),
         }
     } else if (category) |val| {
-        const fmt = "SDL3: [Custom_{d}:{s}] {s}";
+        const fmt = "[Custom_{d}:{s}] {s}";
         switch (pri) {
-            .err, .critical => std.log.err(fmt, .{ val, priority_str, message }),
-            .warn => std.log.warn(fmt, .{ val, priority_str, message }),
-            .info => std.log.info(fmt, .{ val, priority_str, message }),
-            else => std.log.debug(fmt, .{ val, priority_str, message }),
+            .err, .critical => logger.err(fmt, .{ val, priority_str, message }),
+            .warn => logger.warn(fmt, .{ val, priority_str, message }),
+            .info => logger.info(fmt, .{ val, priority_str, message }),
+            else => logger.debug(fmt, .{ val, priority_str, message }),
         }
     } else {
-        const fmt = "SDL3: [Unknown:{s}] {s}";
+        const fmt = "[Unknown:{s}] {s}";
         switch (pri) {
-            .err, .critical => std.log.err(fmt, .{ priority_str, message }),
-            .warn => std.log.warn(fmt, .{ priority_str, message }),
-            .info => std.log.info(fmt, .{ priority_str, message }),
-            else => std.log.debug(fmt, .{ priority_str, message }),
+            .err, .critical => logger.err(fmt, .{ priority_str, message }),
+            .warn => logger.warn(fmt, .{ priority_str, message }),
+            .info => logger.info(fmt, .{ priority_str, message }),
+            else => logger.debug(fmt, .{ priority_str, message }),
         }
     }
 }
