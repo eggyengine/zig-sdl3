@@ -298,6 +298,45 @@ pub const Renderer = struct {
 
     // CreateGPURenderState added in 3.4.0.
 
+    /// Create a texture for a rendering context.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The rendering context.
+    /// * `format`: Pixel format of the texture.
+    /// * `access`: Access method for the texture.
+    /// * `width`: The width of the texture in pixels.
+    /// * `height`: The height of the texture in pixels.
+    ///
+    /// ## Return Value
+    /// Returns the created texture.
+    ///
+    /// ## Remarks
+    /// The contents of a texture when first created are not defined.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    ///
+    /// ## Code Examples
+    /// TODO!!!
+    pub fn createTexture(
+        self: Renderer,
+        format: pixels.Format,
+        access: Texture.Access,
+        width: usize,
+        height: usize,
+    ) !Texture {
+        return .{ .value = try errors.wrapCallNull(*c.SDL_Texture, c.SDL_CreateTexture(
+            self.value,
+            pixels.Format.toSdl(format),
+            @intFromEnum(access),
+            @intCast(width),
+            @intCast(height),
+        )) };
+    }
+
     /// Create a texture from an existing surface.
     ///
     /// ## Function Parameters
@@ -330,6 +369,33 @@ pub const Renderer = struct {
         const ret = c.SDL_CreateTextureFromSurface(
             self.value,
             surface_to_copy.value,
+        );
+        return Texture{ .value = try errors.wrapCallNull(*c.SDL_Texture, ret) };
+    }
+
+    /// Create a texture for a rendering context with the specified properties.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The rendering context.
+    /// * `props`: The properties to use.
+    ///
+    /// ## Return Value
+    /// Returns the created texture.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn createTextureWithProperties(
+        self: Renderer,
+        props: CreateProperties,
+    ) !Texture {
+        const props_sdl = try props.toProperties();
+        defer props_sdl.deinit();
+        const ret = c.SDL_CreateTextureWithProperties(
+            self.value,
+            props_sdl.value,
         );
         return Texture{ .value = try errors.wrapCallNull(*c.SDL_Texture, ret) };
     }
@@ -2749,72 +2815,6 @@ pub const Texture = struct {
         self: Texture,
     ) void {
         self.value.refcount += 1;
-    }
-
-    /// Create a texture for a rendering context.
-    ///
-    /// ## Function Parameters
-    /// * `renderer`: The rendering context.
-    /// * `format`: Pixel format of the texture.
-    /// * `access`: Access method for the texture.
-    /// * `width`: The width of the texture in pixels.
-    /// * `height`: The height of the texture in pixels.
-    ///
-    /// ## Return Value
-    /// Returns the created texture.
-    ///
-    /// ## Remarks
-    /// The contents of a texture when first created are not defined.
-    ///
-    /// ## Thread Safety
-    /// This function should only be called on the main thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL 3.2.0.
-    ///
-    /// ## Code Examples
-    /// TODO!!!
-    pub fn init(
-        renderer: Renderer,
-        format: pixels.Format,
-        access: Access,
-        width: usize,
-        height: usize,
-    ) !Texture {
-        return .{ .value = try errors.wrapCallNull(*c.SDL_Texture, c.SDL_CreateTexture(
-            renderer.value,
-            pixels.Format.toSdl(format),
-            @intFromEnum(access),
-            @intCast(width),
-            @intCast(height),
-        )) };
-    }
-
-    /// Create a texture for a rendering context with the specified properties.
-    ///
-    /// ## Function Parameters
-    /// * `renderer`: The rendering context.
-    /// * `props`: The properties to use.
-    ///
-    /// ## Return Value
-    /// Returns the created texture.
-    ///
-    /// ## Thread Safety
-    /// This function should only be called on the main thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL 3.2.0.
-    pub fn initWithProperties(
-        renderer: Renderer,
-        props: CreateProperties,
-    ) !Texture {
-        const props_sdl = try props.toProperties();
-        defer props_sdl.deinit();
-        const ret = c.SDL_CreateTextureWithProperties(
-            renderer.value,
-            props_sdl.value,
-        );
-        return Texture{ .value = try errors.wrapCallNull(*c.SDL_Texture, ret) };
     }
 
     /// Lock a portion of the texture for write-only pixel access.
