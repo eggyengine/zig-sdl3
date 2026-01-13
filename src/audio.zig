@@ -833,7 +833,7 @@ pub const Device = packed struct {
             self.value,
             if (spec != null) &spec_sdl else null,
             if (callback != null) Cb.run else null,
-            user_data,
+            @ptrCast(user_data),
         );
         return .{
             .value = try errors.wrapCallNull(*c.SDL_AudioStream, ret),
