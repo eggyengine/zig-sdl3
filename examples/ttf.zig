@@ -32,15 +32,14 @@ pub fn main() !void {
     const tag_str = sdl3.ttf.tagToString(tag);
     try log_app.logInfo("Tag 'test' -> {any} -> {s}", .{ tag, &tag_str });
 
-    const wr = try sdl3.render.Renderer.initWithWindow(
+    const window, const renderer = try sdl3.render.Renderer.initWithWindow(
         "SDL_ttf Example",
         screen_width,
         screen_height,
         .{ .resizable = true },
     );
-    defer wr.renderer.deinit();
-    defer wr.window.deinit();
-    const renderer = wr.renderer;
+    defer renderer.deinit();
+    defer window.deinit();
 
     var frame_capper = sdl3.extras.FramerateCapper(f32){ .mode = .{ .unlimited = {} } };
     renderer.setVSync(.{ .on_each_num_refresh = 1 }) catch {
@@ -116,8 +115,8 @@ pub fn main() !void {
 
     const long_text = "This is a very long string that we want to fit into a small space.";
     const max_width = 200;
-    const measured = try font.measureString(long_text, max_width);
-    const truncated_text = try std.fmt.allocPrint(allocator, "{s}...", .{long_text[0..measured.measured_length]});
+    _, const measured_length = try font.measureString(long_text, max_width);
+    const truncated_text = try std.fmt.allocPrint(allocator, "{s}...", .{long_text[0..measured_length]});
     defer allocator.free(truncated_text);
     const truncated_texture = try textureFromSurface(renderer, try font.renderTextBlended(truncated_text, white));
     defer truncated_texture.deinit();
@@ -177,14 +176,14 @@ pub fn main() !void {
 
         for (textures_to_render) |tex_ptr| {
             const tex = tex_ptr.*;
-            const size = try tex.getSize();
-            const dst = sdl3.rect.FRect{ .x = 10, .y = y_pos, .w = size.width, .h = size.height };
+            const width, const height = try tex.getSize();
+            const dst = sdl3.rect.FRect{ .x = 10, .y = y_pos, .w = width, .h = height };
             try renderer.renderTexture(tex, null, dst);
-            y_pos += size.height + 5;
+            y_pos += height + 5;
         }
 
-        const text_pos = try text_obj.getPosition();
-        try sdl3.ttf.drawRendererText(text_obj, @as(f32, @floatFromInt(text_pos.x)), @as(f32, @floatFromInt(text_pos.y)));
+        const text_pos_x, const text_pos_y = try text_obj.getPosition();
+        try sdl3.ttf.drawRendererText(text_obj, @as(f32, @floatFromInt(text_pos_x)), @as(f32, @floatFromInt(text_pos_y)));
 
         try renderer.present();
     }
