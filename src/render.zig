@@ -27,9 +27,84 @@ pub const debug_text_font_character_size: usize = @intCast(c.SDL_DEBUG_TEXT_FONT
 /// This macro is available since SDL 3.2.0.
 pub const software_renderer_name = c.SDL_SOFTWARE_RENDERER;
 
-// GPU render state added in 3.4.0.
+/// A custom GPU render state.
+///
+/// ## Version
+/// This struct is available since SDL 3.4.0.
+pub const GpuRenderState = packed struct {
+    value: *c.SDL_GPURenderState,
 
-// GPU render state description added in 3.4.0.
+    /// Destroy custom GPU render state.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The state to destroy.
+    ///
+    /// ## Thread Safety
+    /// This function should be called on the thread that created the renderer.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn deinit(
+        self: GpuRenderState,
+    ) void {
+        return c.SDL_DestroyGPURenderState(self.value);
+    }
+
+    /// Set fragment shader uniform variables in a custom GPU render state.
+    ///
+    /// ## Function Parameters
+    /// * `slot_index`: The fragment uniform slot to push data to.
+    /// * `data`: Client data to write.
+    ///
+    /// ## Remarks
+    /// The data is copied and will be pushed using `gpu.CommandBuffer.pushFragmentUniformData()` during draw call execution.
+    ///
+    /// ## Thread Safety
+    /// This function should be called on the thread that created the renderer.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setFragmentUniform(
+        self: GpuRenderState,
+        slot_index: u32,
+        data: []const u8,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetGPURenderStateFragmentUniforms(self.value, slot_index, data.ptr, @intCast(data.len)));
+    }
+};
+
+/// A structure specifying the parameters of a GPU render state.
+///
+/// ## Version
+/// This struct is available since SDL 3.4.0.
+pub const GpuRendererStateCreateInfo = struct {
+    /// The fragment shader to use when this render state is active.
+    fragment_shader: gpu.Shader,
+    /// Additional fragment samplers to bind when this render state is active.
+    sampler_bindings: []const gpu.TextureSamplerBinding,
+    /// Storage textures to bind when this render state is active.
+    storage_textures: []const gpu.Texture,
+    /// Storage buffers to bind when this render state is active.
+    storage_buffers: []const gpu.Buffer,
+    /// Additional properties for extensions.
+    props: ?properties.Group = null,
+
+    /// Convert to an SDL value.
+    pub fn toSdl(
+        self: GpuRendererStateCreateInfo,
+    ) c.SDL_GPURenderStateCreateInfo {
+        return .{
+            .fragment_shader = self.fragment_shader.value,
+            .num_sampler_bindings = @intCast(self.sampler_bindings.len),
+            .sampler_bindings = @ptrCast(self.sampler_bindings.ptr),
+            .num_storage_textures = @intCast(self.storage_textures.len),
+            .storage_textures = @ptrCast(self.storage_textures.ptr),
+            .num_storage_buffers = @intCast(self.storage_buffers.len),
+            .storage_buffers = @ptrCast(self.storage_buffers.ptr),
+            .props = if (self.props) |val| val.value else 0,
+        };
+    }
+};
 
 /// A structure representing rendering state
 ///
@@ -120,7 +195,9 @@ pub const Renderer = struct {
         /// The maximum texture width and height.
         max_texture_size: ?usize,
         /// Array representing the available texture formats for this renderer.
-        formats: ?struct { value: ?[*:c.SDL_PIXELFORMAT_UNKNOWN]const c.SDL_PixelFormat },
+        texture_formats: ?struct { value: ?[*:c.SDL_PIXELFORMAT_UNKNOWN]const c.SDL_PixelFormat },
+        /// True if the renderer supports wrapping on non-power of 2 textures.
+        texture_wrapping: ?bool,
         /// Value describing the colorspace for output to the display, defaults to `pixels.Colorspace.srgb`.
         output_colorspace: ?pixels.Colorspace,
         /// True if the output colorspace is `pixels.Colorspace.srgb_linear` and the renderer is showing on a display with HDR enabled.
@@ -174,7 +251,8 @@ pub const Renderer = struct {
                 .render_surface = if (props.get(c.SDL_PROP_RENDERER_SURFACE_POINTER)) |val| (.{ .value = if (val.pointer) |val2| .{ .value = @ptrCast(@alignCast(val2)) } else null }) else null,
                 .vsync = if (props.get(c.SDL_PROP_RENDERER_VSYNC_NUMBER)) |val| .{ .value = video.VSync.fromSdl(@intCast(val.number)) } else null,
                 .max_texture_size = if (props.get(c.SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER)) |val| @intCast(val.number) else null,
-                .formats = if (props.get(c.SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
+                .texture_formats = if (props.get(c.SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
+                .texture_wrapping = if (props.get(c.SDL_PROP_RENDERER_TEXTURE_WRAPPING_BOOLEAN)) |val| val.boolean else null,
                 .output_colorspace = if (props.get(c.SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER)) |val| pixels.Colorspace.fromSdl(@intCast(val.number)) else null,
                 .hdr_enabled = if (props.get(c.SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN)) |val| val.boolean else null,
                 .sdr_white_point = if (props.get(c.SDL_PROP_RENDERER_SDR_WHITE_POINT_FLOAT)) |val| val.float else null,
@@ -294,9 +372,27 @@ pub const Renderer = struct {
         event.* = events.Event.fromSdl(event_sdl);
     }
 
-    // CreateGPURenderer added in 3.4.0.
-
-    // CreateGPURenderState added in 3.4.0.
+    /// Create custom GPU render state.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The renderer to use.
+    /// * `create_info`: A struct describing the GPU render state to create.
+    ///
+    /// ## Return Value
+    /// Returns a custom GPU render state.
+    ///
+    /// ## Thread Safety
+    /// This function should be called on the thread that created the renderer.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn createGpuRenderState(
+        self: Renderer,
+        create_info: GpuRendererStateCreateInfo,
+    ) !GpuRenderState {
+        // TODO: REMOVE CONSTCAST ONCE API IS FIXED!
+        return .{ .value = try errors.wrapCallNull(*c.SDL_GPURenderState, c.SDL_CreateGPURenderState(self.value, @constCast(&create_info.toSdl()))) };
+    }
 
     /// Create a texture from an existing surface.
     ///
@@ -509,7 +605,26 @@ pub const Renderer = struct {
         return .{ @intCast(w), @intCast(h) };
     }
 
-    // getDefaultTextureScalMode() is in SDL 3.4.0.
+    /// Get default texture scale mode of the given renderer.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The renderer to get data from.
+    ///
+    /// ## Return Value
+    /// Returns the default texture scale mode.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getDefaultTextureScaleMode(
+        self: Renderer,
+    ) !surface.ScaleMode {
+        var ret: c.SDL_ScaleMode = undefined;
+        try errors.wrapCallBool(c.SDL_GetDefaultTextureScaleMode(self.value, &ret));
+        return @enumFromInt(ret);
+    }
 
     /// Get the blend mode used for drawing operations.
     ///
@@ -596,6 +711,25 @@ pub const Renderer = struct {
         );
         try errors.wrapCallBool(ret);
         return .{ .r = r, .g = g, .b = b, .a = a };
+    }
+
+    /// Return the GPU device used by a renderer.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The rendering context.
+    ///
+    /// ## Return Value
+    /// Returns the GPU device used by the renderer.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getGpuDevice(
+        self: Renderer,
+    ) !gpu.Device {
+        return .{ .value = try errors.wrapCallNull(*c.SDL_GPUDevice, c.SDL_GetGPURendererDevice(self.value)) };
     }
 
     /// Get device independent resolution and presentation mode for rendering.
@@ -879,7 +1013,24 @@ pub const Renderer = struct {
         return Texture{ .value = ret };
     }
 
-    // getTextureAddressMode added in SDL 3.4.0.
+    /// The addressing mode for a texture when used in `renderGeometry()`.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The rendering context.
+    ///
+    /// ## Return Value
+    /// Returns the texture address modes for the horizontal and vertical coordinates.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getTextureAddressMode(
+        self: Renderer,
+    ) ![2]Texture.AddressMode {
+        var u: c.SDL_TextureAddressMode = undefined;
+        var v: c.SDL_TextureAddressMode = undefined;
+        try errors.wrapCallBool(c.SDL_GetRenderTextureAddressMode(self.value, &u, &v));
+        return .{ try Texture.AddressMode.fromSdl(u), try Texture.AddressMode.fromSdl(v) };
+    }
 
     /// Get the drawing area for the current target.
     ///
@@ -990,6 +1141,41 @@ pub const Renderer = struct {
             if (renderer_name) |str_capture| str_capture.ptr else null,
         );
         return Renderer{ .value = try errors.wrapCallNull(*c.SDL_Renderer, ret) };
+    }
+
+    /// Create a 2D GPU rendering context.
+    ///
+    /// ## Function Parameters
+    /// * `device`: The GPU device to use with the renderer, or `null` to create a device.
+    /// * `window`: The window where rendering is displayed, or `null` to create an offscreen renderer.
+    ///
+    /// ## Return Value
+    /// Returns a valid rendering context.
+    ///
+    /// ## Remarks
+    /// The GPU device to use is passed in as a parameter.
+    /// If this is `null`, then a device will be created normally and can be retrieved using `Renderer.getGpuDevice()`.
+    ///
+    /// The window to use is passed in as a parameter.
+    /// If this is `null`, then this will become an offscreen renderer.
+    /// In that case, you should call `Renderer.setTarget()` to setup rendering to a texture, and then call `Renderer.present()` normally to complete drawing a frame.
+    ///
+    /// ## Thread Safety
+    /// If this function is called with a valid GPU device, it should be called on the thread that created the device.
+    /// If this function is called with a valid window, it should be called on the thread that created the window.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initGpu(
+        device: ?gpu.Device,
+        window: ?video.Window,
+    ) !Renderer {
+        return Renderer{
+            .value = try errors.wrapCallNull(*c.SDL_Renderer, c.SDL_CreateGPURenderer(
+                if (device) |val| val.value else null,
+                if (window) |val| val.value else null,
+            )),
+        };
     }
 
     /// Create a 2D rendering context for a window, with the specified properties.
@@ -1632,7 +1818,18 @@ pub const Renderer = struct {
     /// * `bottom_width`: The width, in pixels, of the bottom corners in `src_rect`.
     /// * `scale`: The scale used to transform the corner of `src_rect` into the corner of `dst_rect`, or `0.0` for an unscaled copy.
     /// * `dst_rect`: The destination rectangle, or `null` for the entire target.
-    pub fn renderTexture9GridTiled(
+    ///
+    /// ## Remarks
+    /// The pixels in the texture are split into a 3x3 grid, using the different corner sizes for each corner, and the sides and center making up the remaining pixels.
+    /// The corners are then scaled using scale and fit into the corners of the destination rectangle.
+    /// The sides and center are then stretched into place to cover the remaining destination rectangle.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn renderTexture9Grid(
         self: Renderer,
         texture: Texture,
         src_rect: ?rect.FRect,
@@ -1659,44 +1856,58 @@ pub const Renderer = struct {
         return errors.wrapCallBool(ret);
     }
 
-    // /// Copy a portion of the source texture to the current rendering target, with affine transform, at subpixel precision.
-    // ///
-    // /// ## Function Parameters
-    // /// * `self`: The renderer which should copy parts of a texture.
-    // /// * `texture`: The source texture.
-    // /// * `src_rect`: The source rectangle, or `null` for the entire texture.
-    // /// * `left_width`: The width, in pixels, of the left corners in `src_rect`.
-    // /// * `right_width`: The width, in pixels, of the right corners in `src_rect`.
-    // /// * `top_width`: The width, in pixels, of the top corners in `src_rect`.
-    // /// * `bottom_width`: The width, in pixels, of the bottom corners in `src_rect`.
-    // /// * `scale`: The scale used to transform the corner of `src_rect` into the corner of `dst_rect`, or `0.0` for an unscaled copy.
-    // /// * `dst_rect`: The destination rectangle, or `null` for the entire target.
-    // /// * `tile_scale`: The scale used to transform the borders and center of `src_rect` into the borders and middle of `dst_rect`, or `1` for an unscaled copy.
-    // pub fn renderTexture9GridTiled(
-    //     self: Renderer,
-    //     texture: Texture,
-    //     src_rect: ?rect.FRect,
-    //     left_width: f32,
-    //     right_width: f32,
-    //     top_height: f32,
-    //     bottom_height: f32,
-    //     scale: f32,
-    //     dst_rect: ?rect.FRect,
-    //     tile_scale: f32,
-    // ) !void {
-    //     const src_rect_sdl: c.SDL_FRect = if (src_rect) |val| val.toSdl() else undefined;
-    //     const dst_rect_sdl: c.SDL_FRect = if (dst_rect) |val| val.toSdl() else undefined;
-    //     const ret = c.SDL_RenderTexture9GridTiled(
-    //         self.value,
-    //         texture.value,
-    //         if (src_rect != null) &src_rect_sdl else null,
-    //         if (dst_rect != null) &dst_rect_sdl else null,
-    //         angle,
-    //         if (center != null) &center_sdl else null,
-    //         flip_mode.toSdl(),
-    //     );
-    //     return errors.wrapCallBool(ret);
-    // }
+    /// Perform a scaled copy using the 9-grid algorithm to the current rendering target at subpixel precision.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The renderer which should copy parts of a texture.
+    /// * `texture`: The source texture.
+    /// * `src_rect`: The source rectangle, or `null` for the entire texture.
+    /// * `left_width`: The width, in pixels, of the left corners in `src_rect`.
+    /// * `right_width`: The width, in pixels, of the right corners in `src_rect`.
+    /// * `top_height`: The width, in pixels, of the top corners in `src_rect`.
+    /// * `bottom_height`: The width, in pixels, of the bottom corners in `src_rect`.
+    /// * `scale`: The scale used to transform the corner of `src_rect` into the corner of `dst_rect`, or `0.0` for an unscaled copy.
+    /// * `dst_rect`: The destination rectangle, or `null` for the entire target.
+    /// * `tile_scale`: The scale used to transform the borders and center of `src_rect` into the borders and middle of `dst_rect`, or `1` for an unscaled copy.
+    ///
+    /// ## Remarks
+    /// The pixels in the texture are split into a 3x3 grid, using the different corner sizes for each corner, and the sides and center making up the remaining pixels.
+    /// The corners are then scaled using scale and fit into the corners of the destination rectangle.
+    /// The sides and center are then tiled into place to cover the remaining destination rectangle.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn renderTexture9GridTiled(
+        self: Renderer,
+        texture: Texture,
+        src_rect: ?rect.FRect,
+        left_width: f32,
+        right_width: f32,
+        top_height: f32,
+        bottom_height: f32,
+        scale: f32,
+        dst_rect: ?rect.FRect,
+        tile_scale: f32,
+    ) !void {
+        const src_rect_sdl: c.SDL_FRect = if (src_rect) |val| val.toSdl() else undefined;
+        const dst_rect_sdl: c.SDL_FRect = if (dst_rect) |val| val.toSdl() else undefined;
+        const ret = c.SDL_RenderTexture9GridTiled(
+            self.value,
+            texture.value,
+            if (src_rect != null) &src_rect_sdl else null,
+            left_width,
+            right_width,
+            top_height,
+            bottom_height,
+            scale,
+            if (dst_rect != null) &dst_rect_sdl else null,
+            tile_scale,
+        );
+        return errors.wrapCallBool(ret);
+    }
 
     /// Copy a portion of the source texture to the current rendering target, with affine transform, at subpixel precision.
     ///
@@ -1867,27 +2078,26 @@ pub const Renderer = struct {
         return errors.wrapCallBool(ret);
     }
 
-    // This is added in SDL 3.4.0.
-    // /// Set default scale mode for new textures for given renderer.
-    // ///
-    // /// ## Function Parameters
-    // /// * `self`: The renderer to update.
-    // /// * `scale_mode`: The scale mode to change to for new textures.
-    // ///
-    // /// ## Remarks
-    // /// When a renderer is created, `scale_mode` defaults to `surface.ScaleMode.linear`.
-    // ///
-    // /// ## Thread Safety
-    // /// This function should only be called on the main thread.
-    // ///
-    // /// ## Version
-    // /// This function is available since SDL 3.4.0.
-    // pub fn setDefaultTextureScaleMode(
-    //     self: Renderer,
-    //     scale_mode: surface.ScaleMode,
-    // ) !void {
-    //     return errors.wrapCallBool(C.setscalemode)
-    // }
+    /// Set default scale mode for new textures for given renderer.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The renderer to update.
+    /// * `scale_mode`: The scale mode to change to for new textures.
+    ///
+    /// ## Remarks
+    /// When a renderer is created, `scale_mode` defaults to `surface.ScaleMode.linear`.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setDefaultTextureScaleMode(
+        self: Renderer,
+        scale_mode: surface.ScaleMode,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetDefaultTextureScaleMode(self.value, @intFromEnum(scale_mode)));
+    }
 
     /// Set the blend mode used for drawing operations (Fill and Line).
     ///
@@ -1968,6 +2178,28 @@ pub const Renderer = struct {
             color.a,
         );
         return errors.wrapCallBool(ret);
+    }
+
+    /// Set custom GPU render state.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The renderer to use.
+    /// * `state`: The state to to use, or `null` to clear custom GPU render state.
+    ///
+    /// ## Remarks
+    /// This function sets custom GPU render state for subsequent draw calls.
+    /// This allows using custom shaders with the GPU renderer.
+    ///
+    /// ## Thread Safety
+    /// This function should be called on the thread that created the renderer.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setGpuRenderState(
+        self: Renderer,
+        state: ?GpuRenderState,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetGPURenderState(self.value, if (state) |val| val.value else null));
     }
 
     /// Set a device independent resolution and presentation mode for rendering.
@@ -2088,7 +2320,22 @@ pub const Renderer = struct {
         return errors.wrapCallBool(ret);
     }
 
-    // SetRenderTextureAddressMode added in SDL 3.4.0.
+    /// Set the texture addressing mode for a texture when used in `renderGeometry()`.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The rendering context.
+    /// * `u_mode`: The texture address mode to use for horizontal coordinates.
+    /// * `v_mode`: The texture address mode to use for vertical coordinates.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setTextureAddressMode(
+        self: Renderer,
+        u_mode: Texture.AddressMode,
+        v_mode: Texture.AddressMode,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetRenderTextureAddressMode(self.value, u_mode.toSdl(), v_mode.toSdl()));
+    }
 
     /// Set the drawing area for rendering on the current target.
     ///
@@ -2226,6 +2473,41 @@ pub const Texture = struct {
         target = c.SDL_TEXTUREACCESS_TARGET,
     };
 
+    /// The addressing mode for a texture when used in `Renderer.renderGeometry()`.
+    ///
+    /// ## Remarks
+    /// This affects how texture coordinates are interpreted outside of [0, 1].
+    /// Texture wrapping is always supported for power of two texture sizes, and is supported for other texture sizes if the `texture_wrapping` property is set to true.
+    ///
+    /// ## Version
+    /// This enum is available since SDL 3.4.0.
+    pub const AddressMode = enum(c.SDL_TextureAddressMode) {
+        /// Wrapping is enabled if texture coordinates are outside [0, 1], this is the default.
+        auto = c.SDL_TEXTURE_ADDRESS_AUTO,
+        /// Texture coordinates are clamped to the [0, 1] range.
+        clamp = c.SDL_TEXTURE_ADDRESS_CLAMP,
+        /// The texture is repeated (tiled).
+        wrap = c.SDL_TEXTURE_ADDRESS_WRAP,
+
+        /// Convert from SDL.
+        pub fn fromSdl(
+            value: c.SDL_TextureAddressMode,
+        ) !AddressMode {
+            if (value == c.SDL_TEXTURE_ADDRESS_INVALID) {
+                errors.callErrorCallback();
+                return error.SdlError;
+            }
+            return @enumFromInt(value);
+        }
+
+        /// Convert to SDL.
+        pub fn toSdl(
+            self: AddressMode,
+        ) c.SDL_TextureAddressMode {
+            return @intFromEnum(self);
+        }
+    };
+
     /// Properties associated with a texture.
     ///
     /// ## Version
@@ -2242,6 +2524,9 @@ pub const Texture = struct {
         width: ?usize = null,
         /// The height of the texture in pixels, required.
         height: ?usize = null,
+        /// Palette use with palettized texture formats.
+        /// This can be set later with `Texture.setPalette()`.
+        palette: ?struct { value: ?pixels.Palette },
         /// Tor HDR10 and floating point textures, this defines the value of 100% diffuse white, with higher values being displayed in the High Dynamic Range headroom.
         /// This defaults to `100` for HDR10 textures and `1` for floating point textures.
         sdr_white_point: ?f32 = null,
@@ -2281,6 +2566,16 @@ pub const Texture = struct {
         opengles2_texture_v: ?i64 = null,
         /// The `VkImage` with layout `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL` associated with the texture, if you want to wrap an existing texture.
         vulkan_texture: ?i64 = null,
+        /// The `VkImageLayout` for the `VkImage`, defaults to `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`.
+        vulkan_layout: ?i64 = null,
+        /// The `gpu.Texture` associated with the texture, if you want to wrap an existing texture.
+        gpu_texture: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the UV plane of an NV12 texture, if you want to wrap an existing texture.
+        gpu_texture_uv: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the U plane of a YUV texture, if you want to wrap an existing texture.
+        gpu_texture_u: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the V plane of a YUV texture, if you want to wrap an existing texture.
+        gpu_texture_v: ?gpu.Texture = null,
 
         /// Convert to SDL.
         pub fn toProperties(
@@ -2297,6 +2592,8 @@ pub const Texture = struct {
                 try ret.set(c.SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, .{ .number = @intCast(val) });
             if (self.height) |val|
                 try ret.set(c.SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, .{ .number = @intCast(val) });
+            if (self.palette) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_PALETTE_POINTER, .{ .pointer = if (val.value) |pal| pal.value else null });
             if (self.sdr_white_point) |val|
                 try ret.set(c.SDL_PROP_TEXTURE_CREATE_SDR_WHITE_POINT_FLOAT, .{ .float = val });
             if (self.hdr_headroom) |val|
@@ -2333,6 +2630,16 @@ pub const Texture = struct {
                 try ret.set(c.SDL_PROP_TEXTURE_CREATE_OPENGLES2_TEXTURE_V_NUMBER, .{ .number = val });
             if (self.vulkan_texture) |val|
                 try ret.set(c.SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, .{ .number = val });
+            if (self.vulkan_layout) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_VULKAN_LAYOUT_NUMBER, .{ .number = val });
+            if (self.gpu_texture) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER, .{ .pointer = val.value });
+            if (self.gpu_texture_uv) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_UV_POINTER, .{ .pointer = val.value });
+            if (self.gpu_texture_u) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_U_POINTER, .{ .pointer = val.value });
+            if (self.gpu_texture_v) |val|
+                try ret.set(c.SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_V_POINTER, .{ .pointer = val.value });
             return ret;
         }
     };
@@ -2397,6 +2704,14 @@ pub const Texture = struct {
         opengles2_texture_v: ?i64,
         /// The `GLenum` for the texture target (`GL_TEXTURE_2D`, `GL_TEXTURE_EXTERNAL_OES`, etc).
         opengles2_texture_target: ?i64,
+        /// The `gpu.Texture` associated with the texture, if you want to wrap an existing texture.
+        gpu_texture: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the UV plane of an NV12 texture, if you want to wrap an existing texture.
+        gpu_texture_uv: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the U plane of a YUV texture, if you want to wrap an existing texture.
+        gpu_texture_u: ?gpu.Texture = null,
+        /// The `gpu.Texture` associated with the V plane of a YUV texture, if you want to wrap an existing texture.
+        gpu_texture_v: ?gpu.Texture = null,
 
         /// Create from SDL.
         pub fn fromProperties(
@@ -2429,6 +2744,10 @@ pub const Texture = struct {
                 .opengles2_texture_u = if (props.get(c.SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_U_NUMBER)) |val| val.number else null,
                 .opengles2_texture_v = if (props.get(c.SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_V_NUMBER)) |val| val.number else null,
                 .opengles2_texture_target = if (props.get(c.SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_TARGET_NUMBER)) |val| val.number else null,
+                .gpu_texture = if (props.get(c.SDL_PROP_TEXTURE_GPU_TEXTURE_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
+                .gpu_texture_uv = if (props.get(c.SDL_PROP_TEXTURE_GPU_TEXTURE_UV_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
+                .gpu_texture_u = if (props.get(c.SDL_PROP_TEXTURE_GPU_TEXTURE_U_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
+                .gpu_texture_v = if (props.get(c.SDL_PROP_TEXTURE_GPU_TEXTURE_V_POINTER)) |val| .{ .value = @ptrCast(@alignCast(val.pointer)) } else null,
             };
         }
     };
@@ -2602,6 +2921,28 @@ pub const Texture = struct {
         self: Texture,
     ) usize {
         return @intCast(self.value.h);
+    }
+
+    /// Get the palette used by a texture.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The texture to query.
+    ///
+    /// ## Return Value
+    /// Returns a the palette used by the texture, or `null` if there is no palette used.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getPalette(
+        self: Texture,
+    ) ?pixels.Palette {
+        if (c.SDL_GetTexturePalette(self.value)) |val| {
+            return .{ .value = val };
+        }
+        return null;
     }
 
     /// Get the properties associated with a texture.
@@ -3044,6 +3385,28 @@ pub const Texture = struct {
             b,
         );
         return errors.wrapCallBool(ret);
+    }
+
+    /// Set the palette used by a texture.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The texture to update.
+    /// * `palette`: The palette structure to use.
+    ///
+    /// ## Remarks
+    /// Setting the palette keeps an internal reference to the palette, which can be safely destroyed afterwards.
+    /// A single palette can be shared with many textures.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setPalette(
+        self: Texture,
+        palette: pixels.Palette,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetTexturePalette(self.value, palette.value));
     }
 
     /// Set the scale mode used for texture scale operations.

@@ -284,6 +284,8 @@ pub const Type = enum(c.SDL_EventType) {
     display_current_mode_changed = c.SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED,
     /// Display has changed content scale.
     display_content_scale_changed = c.SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED,
+    /// Display has changed usable bounds.
+    display_usable_bounds_changed = c.SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED,
     /// Window has been shown.
     window_shown = c.SDL_EVENT_WINDOW_SHOWN,
     /// Window has been hidden.
@@ -2096,6 +2098,7 @@ pub const WindowExposed = struct {
     common: Common,
     /// Associated window.
     id: video.WindowId,
+    /// If event was sent during live resizing.
     live_resize: bool,
 
     /// Convert from SDL.
@@ -2274,6 +2277,8 @@ pub const Event = union(Type) {
     display_current_mode_changed: Display,
     /// Display has changed content scale.
     display_content_scale_changed: Display,
+    /// Display has changed usable bounds
+    display_usable_bounds_changed: Display,
     /// Window has been shown.
     window_shown: Window,
     /// Window has been hidden.
@@ -2499,6 +2504,7 @@ pub const Event = union(Type) {
             c.SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED => .{ .display_desktop_mode_changed = @FieldType(Event, "display_desktop_mode_changed").fromSdl(event) },
             c.SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED => .{ .display_current_mode_changed = @FieldType(Event, "display_current_mode_changed").fromSdl(event) },
             c.SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED => .{ .display_content_scale_changed = @FieldType(Event, "display_content_scale_changed").fromSdl(event) },
+            c.SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED => .{ .display_usable_bounds_changed = @FieldType(Event, "display_usable_bounds_changed").fromSdl(event) },
             c.SDL_EVENT_WINDOW_SHOWN => .{ .window_shown = @FieldType(Event, "window_shown").fromSdl(event) },
             c.SDL_EVENT_WINDOW_HIDDEN => .{ .window_hidden = @FieldType(Event, "window_hidden").fromSdl(event) },
             c.SDL_EVENT_WINDOW_EXPOSED => .{ .window_exposed = @FieldType(Event, "window_exposed").fromSdl(event) },
@@ -2674,6 +2680,7 @@ pub const Event = union(Type) {
             .display_desktop_mode_changed => |val| val.toSdl(.display_desktop_mode_changed),
             .display_current_mode_changed => |val| val.toSdl(.display_current_mode_changed),
             .display_content_scale_changed => |val| val.toSdl(.display_content_scale_changed),
+            .display_usable_bounds_changed => |val| val.toSdl(.display_usable_bounds_changed),
             .window_shown => |val| val.toSdl(.window_shown),
             .window_hidden => |val| val.toSdl(.window_hidden),
             .window_exposed => |val| val.toSdl(.window_exposed),

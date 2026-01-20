@@ -4891,11 +4891,7 @@ pub const TextureSamplerBinding = extern struct {
 
     // Size tests.
     comptime {
-        std.debug.assert(@sizeOf(c.SDL_GPUTextureSamplerBinding) == @sizeOf(TextureSamplerBinding));
-        std.debug.assert(@sizeOf(@FieldType(c.SDL_GPUTextureSamplerBinding, "texture")) == @sizeOf(@FieldType(TextureSamplerBinding, "texture")));
-        std.debug.assert(@offsetOf(c.SDL_GPUTextureSamplerBinding, "texture") == @offsetOf(TextureSamplerBinding, "texture"));
-        std.debug.assert(@sizeOf(@FieldType(c.SDL_GPUTextureSamplerBinding, "sampler")) == @sizeOf(@FieldType(TextureSamplerBinding, "sampler")));
-        std.debug.assert(@offsetOf(c.SDL_GPUTextureSamplerBinding, "sampler") == @offsetOf(TextureSamplerBinding, "sampler"));
+        errors.assertStructsEqual(TextureSamplerBinding, c.SDL_GPUTextureSamplerBinding);
     }
 };
 

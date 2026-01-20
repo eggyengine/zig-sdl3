@@ -84,8 +84,8 @@ pub const ScaleMode = enum(c.SDL_ScaleMode) {
     nearest = c.SDL_SCALEMODE_NEAREST,
     /// Linear pixel sampling.
     linear = c.SDL_SCALEMODE_LINEAR,
-    // Pixel art and invalid from SDL 3.4.0?
-
+    /// Nearest pixel sampling with improved scaling for pixel art, available since SDL 3.4.0
+    pixel_art = c.SDL_SCALEMODE_PIXELART,
 };
 
 /// A collection of pixels used in software blitting.
@@ -133,10 +133,15 @@ pub const Surface = packed struct {
         /// where N is a floating point scale factor applied in linear space, and "none", which disables tone mapping.
         /// This defaults to "chrome".
         tonemap_operator: ?[:0]const u8 = null,
-        // /// The hotspot pixel offset from the left edge of the image, if this surface is being used as a cursor.
-        // hotspot_x: ?i64 = null,
-        // /// The hotspot pixel offset from the top edge of the image, if this surface is being used as a cursor.
-        // hotspot_y: ?i64 = null,
+        /// The hotspot pixel offset from the left edge of the image, if this surface is being used as a cursor.
+        hotspot_x: ?i64 = null,
+        /// The hotspot pixel offset from the top edge of the image, if this surface is being used as a cursor.
+        hotspot_y: ?i64 = null,
+        /// he number of degrees a surface's data is meant to be rotated clockwise to make the image right-side up.
+        /// Default 0. This is used by the camera API, if a mobile device is oriented differently than what its camera provides
+        /// (i.e. - the camera always provides portrait images but the phone is being held in landscape orientation).
+        /// Since SDL 3.4.0.
+        rotation: ?f32 = null,
 
         /// Convert from an SDL group.
         pub fn fromSdl(value: properties.Group) Properties {
@@ -144,6 +149,9 @@ pub const Surface = packed struct {
                 .sdr_white_point = if (value.get(c.SDL_PROP_SURFACE_SDR_WHITE_POINT_FLOAT)) |val| val.float else null,
                 .hdr_headroom = if (value.get(c.SDL_PROP_SURFACE_HDR_HEADROOM_FLOAT)) |val| val.float else null,
                 .tonemap_operator = if (value.get(c.SDL_PROP_SURFACE_TONEMAP_OPERATOR_STRING)) |val| val.string else null,
+                .hotspot_x = if (value.get(c.SDL_PROP_SURFACE_HOTSPOT_X_NUMBER)) |val| val.number else null,
+                .hotspot_y = if (value.get(c.SDL_PROP_SURFACE_HOTSPOT_Y_NUMBER)) |val| val.number else null,
+                .rotation = if (value.get(c.SDL_PROP_SURFACE_ROTATION_FLOAT)) |val| val.float else null,
             };
         }
 
@@ -155,6 +163,12 @@ pub const Surface = packed struct {
                 try value.set(c.SDL_PROP_SURFACE_HDR_HEADROOM_FLOAT, .{ .float = val });
             if (self.tonemap_operator) |val|
                 try value.set(c.SDL_PROP_SURFACE_TONEMAP_OPERATOR_STRING, .{ .string = val });
+            if (self.hotspot_x) |val|
+                try value.set(c.SDL_PROP_SURFACE_HOTSPOT_X_NUMBER, .{ .number = val });
+            if (self.hotspot_y) |val|
+                try value.set(c.SDL_PROP_SURFACE_HOTSPOT_Y_NUMBER, .{ .number = val });
+            if (self.rotation) |val|
+                try value.set(c.SDL_PROP_SURFACE_ROTATION_FLOAT, .{ .float = val });
         }
     };
 
@@ -1270,6 +1284,32 @@ pub const Surface = packed struct {
         return Surface{ .value = try errors.wrapCallNull(*c.SDL_Surface, ret) };
     }
 
+    /// Load a BMP or PNG image from a file.
+    ///
+    /// ## Function Parameters
+    /// * `path`: The file to load.
+    ///
+    /// ## Return Value
+    /// Returns the new surface structure.
+    ///
+    /// ## Remarks
+    /// The new surface should be freed with `surface.Surface.deinit()`.
+    /// Not doing so will result in a memory leak.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initFromFile(
+        path: [:0]const u8,
+    ) !Surface {
+        const ret = c.SDL_LoadSurface(
+            path.ptr,
+        );
+        return Surface{ .value = try errors.wrapCallNull(*c.SDL_Surface, ret) };
+    }
+
     /// Load a BMP image from a file.
     ///
     /// ## Function Parameters
@@ -1282,10 +1322,10 @@ pub const Surface = packed struct {
     /// The new surface should be freed with `surface.Surface.deinit()`.
     /// Not doing so will result in a memory leak.
     ///
-    /// Thread Safety
+    /// ## Thread Safety
     /// It is safe to call this function from any thread.
     ///
-    /// Version
+    /// ## Version
     /// This function is available since SDL 3.2.0.
     pub fn initFromBmpFile(
         path: [:0]const u8,
@@ -1319,6 +1359,96 @@ pub const Surface = packed struct {
         close_stream_after: bool,
     ) !Surface {
         const ret = c.SDL_LoadBMP_IO(
+            stream.value,
+            close_stream_after,
+        );
+        return Surface{ .value = try errors.wrapCallNull(*c.SDL_Surface, ret) };
+    }
+
+    /// Load a BMP or PNG image from a seekable SDL data stream.
+    ///
+    /// ## Function Parameters
+    /// * `stream`: The data stream for the surface.
+    /// * `close_stream_after`: Close `stream` before returning, even on error.
+    ///
+    /// ## Return Value
+    /// Returns the new surface structure.
+    ///
+    /// ## Remarks
+    /// The new surface should be freed with `surface.Surface.deinit()`.
+    /// Not doing so will result in a memory leak.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initFromIo(
+        stream: io_stream.Stream,
+        close_stream_after: bool,
+    ) !Surface {
+        const ret = c.SDL_LoadSurface_IO(
+            stream.value,
+            close_stream_after,
+        );
+        return Surface{ .value = try errors.wrapCallNull(*c.SDL_Surface, ret) };
+    }
+
+    /// Load a PNG image from a file.
+    ///
+    /// ## Function Parameters
+    /// * `path`: The PNG file to load.
+    ///
+    /// ## Return Value
+    /// Returns the new surface structure.
+    ///
+    /// ## Remarks
+    /// This is intended as a convenience function for loading images from trusted sources.
+    /// If you want to load arbitrary images you should use `libpng` or another image loading library designed with security in mind.
+    ///
+    /// The new surface should be freed with `surface.Surface.deinit()`.
+    /// Not doing so will result in a memory leak.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initFromPngFile(
+        path: [:0]const u8,
+    ) !Surface {
+        const ret = c.SDL_LoadPNG(
+            path.ptr,
+        );
+        return Surface{ .value = try errors.wrapCallNull(*c.SDL_Surface, ret) };
+    }
+
+    /// Create a surface from a PNG image from a seekable stream.
+    ///
+    /// ## Function Parameters
+    /// * `stream`: The data stream for the surface.
+    /// * `close_stream_after`: Close `stream` before returning, even on error.
+    ///
+    /// ## Return Value
+    /// Returns the new surface structure.
+    ///
+    /// ## Remarks
+    /// This is intended as a convenience function for loading images from trusted sources.
+    /// If you want to load arbitrary images you should use `libpng` or another image loading library designed with security in mind.
+    ///
+    /// The new surface should be freed with `surface.Surface.deinit()`.
+    /// Not doing so will result in a memory leak.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn initFromPngIo(
+        stream: io_stream.Stream,
+        close_stream_after: bool,
+    ) !Surface {
+        const ret = c.SDL_LoadPNG_IO(
             stream.value,
             close_stream_after,
         );
@@ -1582,6 +1712,38 @@ pub const Surface = packed struct {
         );
     }
 
+    /// Return a copy of a surface rotated clockwise a number of degrees.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The surface to rotate.
+    /// * `angle`: The rotation angle, in degrees.
+    ///
+    /// ## Return Value
+    /// Returns a rotated copy of the surface.
+    ///
+    /// ## Remarks
+    /// The angle of rotation can be negative for counter-clockwise rotation.
+    ///
+    /// When the rotation isn't a multiple of 90 degrees, the resulting surface is larger than the original, with the background filled in with the colorkey,
+    /// if available, or RGBA 255/255/255/0 if not.
+    ///
+    /// If surface has the `rotation` property set on it, the new copy will have the adjusted value set: if the rotation property is 90 and angle was 30,
+    /// the new surface will have a property value of 60 (that is: to be upright vs gravity, this surface needs to rotate 60 more degrees).
+    /// However, note that further rotations on the new surface in this example will produce unexpected results,
+    /// since the image will have resized and padded to accommodate the not-90 degree angle.
+    ///
+    /// ## Thread Safety
+    /// This function can be called on different threads with different surfaces.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4
+    pub fn rotate(
+        self: Surface,
+        angle: f32,
+    ) !Surface {
+        return .{ .value = try errors.wrapCallNull(*c.SDL_Surface, c.SDL_RotateSurface(self.value, angle)) };
+    }
+
     /// Save a surface to a file.
     ///
     /// ## Function Parameters
@@ -1594,7 +1756,7 @@ pub const Surface = packed struct {
     /// YUV and paletted 1-bit and 4-bit formats are not supported.
     ///
     /// ## Thread Safety
-    /// This function is not thread safe.
+    /// This function can be called on different threads with different surfaces.
     ///
     /// ## Version
     /// This function is available since SDL 3.2.0.
@@ -1622,7 +1784,7 @@ pub const Surface = packed struct {
     /// YUV and paletted 1-bit and 4-bit formats are not supported.
     ///
     /// ## Thread Safety
-    /// This function is not thread safe.
+    /// This function can be called on different threads with different surfaces.
     ///
     /// ## Version
     /// This function is available since SDL 3.2.0.
@@ -1632,6 +1794,53 @@ pub const Surface = packed struct {
         close_stream_after: bool,
     ) !void {
         const ret = c.SDL_SaveBMP_IO(
+            self.value,
+            stream.value,
+            close_stream_after,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Save a surface to a file.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The surface containing the image to be saved.
+    /// * `path`: A file to save to.
+    ///
+    /// ## Thread Safety
+    /// This function can be called on different threads with different surfaces.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn savePngFile(
+        self: Surface,
+        path: [:0]const u8,
+    ) !void {
+        const ret = c.SDL_SavePNG(
+            self.value,
+            path.ptr,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Save a surface to a seekable SDL data stream in PNG format.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The surface containing the image to be saved.
+    /// * `stream`: The data stream to save to.
+    /// * `close_stream_after`: Will close the stream before returning, even on error.
+    ///
+    /// ## Thread Safety
+    /// This function can be called on different threads with different surfaces.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn savePngIo(
+        self: Surface,
+        stream: io_stream.Stream,
+        close_stream_after: bool,
+    ) !void {
+        const ret = c.SDL_SavePNG_IO(
             self.value,
             stream.value,
             close_stream_after,
