@@ -2024,7 +2024,7 @@ fn allocRealloc(mem: ?[*]u8, size: usize) ?[*]u8 {
         return new_mem;
     }
     const new_mem = makeAllocation(size, false) orelse return null;
-    @memcpy(new_mem[0..size], old_mem[0..size]);
+    @memcpy(new_mem[0..@min(size, old_allocation.size)], old_mem[0..@min(size, old_allocation.size)]);
     custom_allocator.free(old_bytes);
     return new_mem;
 }
