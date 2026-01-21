@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// Pen axis indices.
@@ -31,6 +32,35 @@ pub const Axis = enum(c.SDL_PenAxis) {
     tangential_pressure = c.SDL_PEN_AXIS_TANGENTIAL_PRESSURE,
 };
 
+/// An enum that describes the type of a pen device.
+///
+/// ## Remarks
+/// A "direct" device is a pen that touches a graphic display (like an Apple Pencil on an iPad's screen).
+/// "Indirect" devices touch an external tablet surface that is connected to the machine but is not a display (like a lower-end Wacom tablet connected over USB).
+///
+/// Apps may use this information to decide if they should draw a cursor; if the pen is touching the screen directly,
+/// a cursor doesn't make sense and can be in the way, but becomes necessary for indirect devices to know where on the display they are interacting.
+///
+/// ## Version
+/// This enum is available since SDL 3.4.0.
+pub const DeviceType = enum(c.SDL_PenDeviceType) {
+    /// Pen touches display.
+    direct = c.SDL_PEN_DEVICE_TYPE_DIRECT,
+    /// Pen touches something that isn't the display.
+    indirect = c.SDL_PEN_DEVICE_TYPE_INDIRECT,
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(value: c.SDL_PenDeviceType) !?DeviceType {
+        if (value == c.SDL_PEN_DEVICE_TYPE_INVALID) {
+            errors.callErrorCallback();
+            return error.SdlError;
+        }
+        if (value == c.SDL_PEN_DEVICE_TYPE_UNKNOWN)
+            return null;
+        return @enumFromInt(value);
+    }
+};
+
 /// SDL pen instance IDs.
 ///
 /// ## Remarks
@@ -45,6 +75,25 @@ pub const Id = packed struct {
     // Size tests.
     comptime {
         std.debug.assert(@sizeOf(c.SDL_PenID) == @sizeOf(Id));
+    }
+
+    /// Get the device type of the given pen.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The pen instance ID.
+    ///
+    /// ## Return Value
+    /// Returns the pen device type, or `null` if unknown.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getDeviceType(
+        self: Id,
+    ) !?DeviceType {
+        return try DeviceType.fromSdl(c.SDL_GetPenDeviceType(self.value));
     }
 };
 

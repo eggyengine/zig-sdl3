@@ -65,6 +65,29 @@ pub fn getSimdAlignment() usize {
     return c.SDL_GetSIMDAlignment();
 }
 
+/// Report the size of a page of memory.
+///
+/// ## Return Value
+/// Returns the size of a single page of memory, in bytes, or `null` if SDL can't determine this information.
+///
+/// ## Remarks
+/// Different platforms might have different memory page sizes.
+/// In current times, 4 kilobytes is not unusual, but newer systems are moving to larger page sizes, and esoteric platforms might have any unexpected size.
+///
+/// If `null` is returned, defaulting to `4096` is often a reasonable option.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// ## Version
+/// This function is available since SDL 3.4.0.
+pub fn getSystemPageSize() ?usize {
+    const ret = c.SDL_GetSystemPageSize();
+    if (ret == 0)
+        return null;
+    return @intCast(ret);
+}
+
 /// Get the amount of RAM configured in the system.
 ///
 /// ## Return Value

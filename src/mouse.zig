@@ -26,7 +26,7 @@ const video = @import("video.zig");
 /// the `x` and `y` values.
 ///
 /// ## Version
-/// This datatype is available since SDL 3.2.6.
+/// This datatype is available since SDL 3.4.0.
 pub fn MotionTransformCallback(
     comptime UserData: type,
 ) type {
@@ -749,28 +749,34 @@ pub fn set(
     return errors.wrapCallBool(c.SDL_SetCursor(if (cursor) |val| val.value else null));
 }
 
-// TODO: ADD THIS WHEN SDL IS UPDATED!
-// /// Set a user-defined function by which to transform relative mouse inputs.
-// ///
-// /// ## Function Parameters
-// /// * `callback`: A callback used to transform relative mouse motion, or `null` for default behavior.
-// /// * `user_data`: A pointer that will be passed to `callback`.
-// ///
-// /// ## Remarks
-// /// This overrides the relative system scale and relative speed scale hints.
-// /// Should be called prior to enabling relative mouse mode, fails otherwise.
-// ///
-// /// ## Thread Safety
-// /// This function should only be called on the main thread.
-// ///
-// /// ## Version
-// /// This function is available since SDL 3.4.0.
-// pub fn setRelativeTransform(
-//     callback: MotionTransformCallback,
-//     user_data: ?*anyopaque,
-// ) !void {
-//     return errors.wrapCallBool(c.SDL_SetRelativeMouseTransform(callback, user_data));
-// }
+/// Set a user-defined function by which to transform relative mouse inputs.
+///
+/// ## Function Parameters
+/// * `UserData`: Type of userdata to pass.
+/// * `callback`: A callback used to transform relative mouse motion, or `null` for default behavior.
+/// * `user_data`: A pointer that will be passed to `callback`.
+///
+/// ## Remarks
+/// This overrides the relative system scale and relative speed scale hints.
+/// Should be called prior to enabling relative mouse mode, fails otherwise.
+///
+/// ## Thread Safety
+/// This function should only be called on the main thread.
+///
+/// ## Version
+/// This function is available since SDL 3.4.0.
+pub fn setRelativeTransform(
+    comptime UserData: type,
+    callback: ?MotionTransformCallback(UserData),
+    user_data: ?*UserData,
+) !void {
+    const Cb = struct {
+        fn run(c_user_data: ?*anyopaque, c_time_stamp: u64, c_window: [*c]c.SDL_Window, c_mouse_id: c.SDL_MouseID, c_x: [*c]f32, c_y: [*c]f32) void {
+            callback.?(@ptrCast(@alignCast(c_user_data)), c_time_stamp, if (c_window) |val| .{ .value = val } else null, .{ .value = c_mouse_id }, c_x, c_y);
+        }
+    };
+    return errors.wrapCallBool(c.SDL_SetRelativeMouseTransform(if (callback != null) Cb.run else null, user_data));
+}
 
 /// Set a window's mouse grab mode.
 ///

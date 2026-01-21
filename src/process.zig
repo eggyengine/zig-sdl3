@@ -56,8 +56,8 @@ pub const Process = packed struct {
         /// An environment pointer.
         /// If this property is set, it will be the entire environment for the process, otherwise the current environment is used.
         environment: ?sdl3.Environment = null,
-        // /// A UTF-8 encoded string representing the working directory for the process, defaults to the current working directory.
-        // working_directory: ?[:0]const u8,
+        /// A UTF-8 encoded string representing the working directory for the process, defaults to the current working directory.
+        working_directory: ?[:0]const u8,
         /// A IO value describing where standard input for the process comes from, defaults to `Process.Io.ignored` if unspecified.
         stdin: ?Io = null,
         /// A stream pointer when `stdin` is set to `Process.Io.redirect`.
@@ -82,6 +82,8 @@ pub const Process = packed struct {
             try ret.set(c.SDL_PROP_PROCESS_CREATE_ARGS_POINTER, .{ .pointer = @ptrCast(@constCast(self.args.ptr)) });
             if (self.environment) |val|
                 try ret.set(c.SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, .{ .pointer = val.value });
+            if (self.working_directory) |val|
+                try ret.set(c.SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, .{ .string = val });
             if (self.stdin) |val|
                 try ret.set(c.SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, .{ .number = @intFromEnum(val) });
             if (self.stdin_redirect) |val|

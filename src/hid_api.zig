@@ -1,5 +1,6 @@
 const c = @import("c");
 const errors = @import("errors.zig");
+const properties = @import("properties.zig");
 const std = @import("std");
 
 /// HID underlying bus types.
@@ -28,6 +29,22 @@ pub const BusType = enum(c.SDL_hid_bus_type) {
 /// This struct is available since SDL 3.2.0.
 pub const Device = struct {
     value: *c.SDL_hid_device,
+
+    /// Properties provided by the HID interface.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const Properties = struct {
+        /// The `libusb_device_handle` associated with the device, if it was opened using libusb.
+        libusb_device_handle: ?struct { value: ?*anyopaque },
+
+        /// Convert from an SDL value.
+        pub fn fromSdl(value: properties.Group) Properties {
+            return .{
+                .libusb_device_handle = if (value.get(c.SDL_PROP_HIDAPI_LIBUSB_DEVICE_HANDLE_POINTER)) |val| .{ .value = val.pointer } else null,
+            };
+        }
+    };
 
     /// Close a HID device.
     ///
@@ -175,6 +192,23 @@ pub const Device = struct {
             errors.callErrorCallback();
             return error.SdlError;
         }
+    }
+
+    /// Get the properties associated with an HID device.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The device handle.
+    ///
+    /// ## Return Value
+    /// Returns the HID device properties.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getProperties(
+        self: Device,
+    ) !Properties {
+        const ret = c.SDL_hid_get_properties(self.value);
+        return Properties.fromSdl(properties.Group{ .value = try errors.wrapCall(c.SDL_PropertiesID, ret, 0) });
     }
 
     /// Get a report descriptor from a HID device.

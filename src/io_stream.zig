@@ -1,6 +1,7 @@
 const c = @import("c");
 const errors = @import("errors.zig");
 const properties = @import("properties.zig");
+const sdl3 = @import("sdl3.zig");
 const std = @import("std");
 
 /// Status, set by a read or write operation.
@@ -299,6 +300,9 @@ pub const Stream = struct {
             /// Memory will be allocated in multiples of this size, defaulting to `1024`.
             chunk_size: ?usize = null,
         },
+        /// This will be called with the passed `mem` pointer when closing the stream.
+        /// By default it is unset, i.e., the memory will not be freed.
+        memory_free_function: ?sdl3.FreeFuncC,
         /// Data that may set by `io_stream.Stream.initFromFile()`.
         /// A pointer, that can be cast to a win32 `HANDLE`, that this stream is using to access the filesystem.
         /// If the program isn't running on Windows, or SDL used some other method to access the filesystem, this property will not be set.
@@ -328,6 +332,7 @@ pub const Stream = struct {
                     .ptr = val.pointer,
                     .chunk_size = if (props.get(c.SDL_PROP_IOSTREAM_DYNAMIC_CHUNKSIZE_NUMBER)) |chunk_size| @intCast(chunk_size.number) else null,
                 } else null,
+                .memory_free_function = if (props.get(c.SDL_PROP_IOSTREAM_MEMORY_FREE_FUNC_POINTER)) |val| if (val.pointer) |pv| @ptrCast(@alignCast(pv)) else null else null,
                 .window_handle = if (props.get(c.SDL_PROP_IOSTREAM_WINDOWS_HANDLE_POINTER)) |val| val.pointer.? else null,
                 .stdio_file = if (props.get(c.SDL_PROP_IOSTREAM_STDIO_FILE_POINTER)) |val| val.pointer.? else null,
                 .file_descriptor = if (props.get(c.SDL_PROP_IOSTREAM_FILE_DESCRIPTOR_NUMBER)) |val| val.number else null,
@@ -353,6 +358,9 @@ pub const Stream = struct {
                 try props.clear(c.SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER);
                 try props.clear(c.SDL_PROP_IOSTREAM_DYNAMIC_CHUNKSIZE_NUMBER);
             }
+            if (self.memory_free_function) |val| {
+                try props.set(c.SDL_PROP_IOSTREAM_MEMORY_FREE_FUNC_POINTER, .{ .pointer = @constCast(val) });
+            } else try props.clear(c.SDL_PROP_IOSTREAM_MEMORY_FREE_FUNC_POINTER);
             if (self.window_handle) |val| {
                 try props.set(c.SDL_PROP_IOSTREAM_WINDOWS_HANDLE_POINTER, .{ .pointer = val });
             } else try props.clear(c.SDL_PROP_IOSTREAM_WINDOWS_HANDLE_POINTER);
