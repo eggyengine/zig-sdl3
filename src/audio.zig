@@ -81,6 +81,33 @@ pub fn StreamCallback(
     ) void;
 }
 
+/// A callback that fires for completed `Stream.putNoData()` data.
+///
+/// ## Function Parameters
+/// * `user_data`: An opaque pointer provided by the app for their personal use.
+/// * `buf`: Buffer provided to the put no data function.
+///
+/// ## Remarks
+/// When using this to provide data to a `Stream`, it's not safe to dispose of the data until the stream has completely consumed it.
+/// Often times it's difficult to know exactly when this has happened.
+///
+/// This callback fires once when the stream no longer needs the buffer, allowing the app to easily free or reuse it.
+///
+/// ## Thread Safety
+/// This callbacks may run from any thread, so if you need to protect shared data, you should use `Stream.lock()` to serialize access;
+/// this lock will be held before your callback is called, so your callback does not need to manage the lock explicitly.
+///
+/// ## Version
+/// This datatype is available since SDL 3.4.0.
+pub fn StreamDataCompleteCallback(
+    comptime UserData: type,
+) type {
+    return *const fn (
+        user_data: ?*UserData,
+        buf: []const u8,
+    ) void;
+}
+
 /// Audio format.
 ///
 /// ## Version
@@ -1017,6 +1044,32 @@ pub const Stream = packed struct {
         std.debug.assert(@sizeOf(*c.SDL_AudioStream) == @sizeOf(Stream));
     }
 
+    /// Properties for an audio stream.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const Properties = struct {
+        /// If true (the default), the stream be automatically cleaned up when the audio subsystem quits.
+        /// If set to false, the streams will persist beyond that.
+        /// This property is ignored for streams created through `Device.openStream()`, and will always be cleaned up.
+        /// Streams that are not cleaned up will still be unbound from devices when the audio subsystem quits.
+        /// This property was added in SDL 3.4.0.
+        auto_cleanup: ?bool = null,
+
+        /// Convert from an SDL value.
+        pub fn fromSdl(value: properties.Group) Properties {
+            return .{
+                .auto_cleanup = if (value.get(c.SDL_PROP_AUDIOSTREAM_AUTO_CLEANUP_BOOLEAN)) |val| val.boolean else null,
+            };
+        }
+
+        /// Convert to an SDL value.
+        pub fn toSdl(self: Properties, group: properties.Group) !void {
+            if (self.auto_cleanup) |val|
+                try group.set(c.SDL_PROP_AUDIOSTREAM_AUTO_CLEANUP_BOOLEAN, .{ .boolean = val });
+        }
+    };
+
     /// Clear any pending data in the stream.
     ///
     /// ## Function Parameters
@@ -1259,7 +1312,7 @@ pub const Stream = packed struct {
     /// * `self`: The stream to query.
     ///
     /// ## Return Value
-    /// Returns a valid property ID.
+    /// Returns properties for the stream.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -1268,10 +1321,11 @@ pub const Stream = packed struct {
     /// This function is available since SDL 3.2.0.
     pub fn getProperties(
         self: Stream,
-    ) !properties.Group {
-        return .{
+    ) !Properties {
+        const group = properties.Group{
             .value = try errors.wrapCall(c.SDL_PropertiesID, c.SDL_GetAudioStreamProperties(self.value), 0),
         };
+        return Properties.fromSdl(group);
     }
 
     /// Get the number of bytes currently queued.
@@ -1438,6 +1492,94 @@ pub const Stream = packed struct {
             data.ptr,
             @intCast(data.len),
         ));
+    }
+
+    /// Add external data to an audio stream without copying it.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The stream the audio data is being added to.
+    /// * `data`: Buffer of audio data to read.
+    /// * `UserData`: Type of user data for the callback.
+    /// * `callback`: The callback function to call when the data is no longer needed by the stream.
+    /// * `user_data`: An opaque pointer provided to the callback for its own personal use.
+    ///
+    /// ## Remarks
+    /// Unlike `putData()`, this function does not make a copy of the provided data, instead storing the provided pointer.
+    /// This means that the put operation does not need to allocate and copy the data, but the original data must remain available until the stream is done with it,
+    /// either by being read from the stream in its entirety, or a call to `clear()` or `deinit()`.
+    ///
+    /// The data must match the format/channels/samplerate specified in the latest call to `setFormat()`,
+    /// or the format specified when creating the stream if it hasn't been changed.
+    ///
+    /// An optional callback may be provided, which is called when the stream no longer needs the data. Once this callback fires, the stream will not access the data again.
+    /// This callback will fire for any reason the data is no longer needed, including clearing or destroying the stream.
+    ///
+    /// Note that there is still an allocation to store tracking information, so this function is more efficient for larger blocks of data.
+    /// If you're planning to put a few samples at a time, it will be more efficient to use `putData()`, which allocates and buffers in blocks.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread, but if the stream has a callback set, the caller might need to manage extra locking.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn putDataNoCopy(
+        self: Stream,
+        data: []const u8,
+        comptime UserData: type,
+        callback: ?StreamDataCompleteCallback(UserData),
+        user_data: ?*UserData,
+    ) !void {
+        const Cb = struct {
+            fn run(c_user_data: ?*anyopaque, c_buf: ?*const anyopaque, c_buf_len: c_int) void {
+                callback.?(@ptrCast(@alignCast(c_user_data)), @as([*]u8, @ptrCast(@alignCast(c_buf)))[0..@intCast(c_buf_len)]);
+            }
+        };
+        return errors.wrapCallBool(c.SDL_PutAudioStreamDataNoCopy(
+            self.value,
+            data.ptr,
+            @intCast(data.len),
+            if (callback != null) Cb.run else null,
+            user_data,
+        ));
+    }
+
+    /// Add data to the stream with each channel in a separate array.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The stream the audio data is being added to.
+    /// * `channel_buffers`: Slice of arrays for the channel buffer data.
+    /// * `num_samples`: The number of samples per array to write to the stream.
+    ///
+    /// ## Remarks
+    /// This data must match the format/channels/samplerate specified in the latest call to `setFormat()`,
+    /// or the format specified when creating the stream if it hasn't been changed.
+    ///
+    /// The data will be interleaved and queued.
+    /// Note that the stream only operates on interleaved data, so this is simply a convenience function for easily queueing data from sources that provide separate arrays.
+    /// There is no equivalent function to retrieve planar data.
+    ///
+    /// The arrays in `channel_buffers` are ordered as they are to be interleaved; the first array will be the first sample in the interleaved data.
+    /// Any individual array may be `null`; in this case, silence will be interleaved for that channel.
+    ///
+    /// If more channels are specified than the current input spec, they are ignored.
+    /// If less channels are specified, the missing arrays are treated as if they are `null` (silence is written to those channels).
+    ///
+    /// Note that `num_samples` is the number of samples per array.
+    /// This can also be thought of as the number of sample frames to be queued.
+    /// A value of 1 with stereo arrays will queue two samples to the stream.
+    /// This is different than `putData()`, which wants the size of a single array in bytes.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread, but if the stream has a callback set, the caller might need to manage extra locking.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn putPlanarData(
+        self: Stream,
+        channel_buffers: []const [*c]const u8,
+        num_samples: usize,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_PutAudioStreamPlanarData(self.value, @ptrCast(channel_buffers), @intCast(channel_buffers.len), @intCast(num_samples)));
     }
 
     /// Use this function to unpause audio playback on the audio device associated with an audio stream.
@@ -1695,6 +1837,23 @@ pub const Stream = packed struct {
         return errors.wrapCallBool(
             c.SDL_SetAudioStreamOutputChannelMap(self.value, if (channel_map) |val| val.ptr else null, @intCast(if (channel_map) |val| val.len else 0)),
         );
+    }
+
+    /// Set the properties associated with an audio stream.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The stream to set properties for.
+    /// * `props`: The properties to set.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn setProperties(
+        self: Stream,
+        props: Properties,
+    ) !void {
+        try props.toSdl(.{
+            .value = try errors.wrapCall(c.SDL_PropertiesID, c.SDL_GetAudioStreamProperties(self.value), 0),
+        });
     }
 
     /// Set a callback that runs when data is added to an audio stream.

@@ -91,6 +91,8 @@ pub const Group = enum {
     gamepad,
     /// Touch events.
     touch,
+    /// Pinch events.
+    pinch,
     /// Clipboard events.
     clipboard,
     /// Drag and drop events.
@@ -212,11 +214,12 @@ pub const Group = enum {
             .application => .{ c.SDL_EVENT_QUIT, c.SDL_EVENT_SYSTEM_THEME_CHANGED },
             .display => .{ c.SDL_EVENT_DISPLAY_FIRST, c.SDL_EVENT_DISPLAY_LAST },
             .window => .{ c.SDL_EVENT_WINDOW_FIRST, c.SDL_EVENT_WINDOW_LAST },
-            .keyboard => .{ c.SDL_EVENT_KEY_DOWN, c.SDL_EVENT_TEXT_EDITING_CANDIDATES },
+            .keyboard => .{ c.SDL_EVENT_KEY_DOWN, c.SDL_EVENT_SCREEN_KEYBOARD_HIDDEN },
             .mouse => .{ c.SDL_EVENT_MOUSE_MOTION, c.SDL_EVENT_MOUSE_REMOVED },
             .joystick => .{ c.SDL_EVENT_JOYSTICK_AXIS_MOTION, c.SDL_EVENT_JOYSTICK_UPDATE_COMPLETE },
             .gamepad => .{ c.SDL_EVENT_GAMEPAD_AXIS_MOTION, c.SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED },
             .touch => .{ c.SDL_EVENT_FINGER_DOWN, c.SDL_EVENT_FINGER_CANCELED },
+            .pinch => .{ c.SDL_EVENT_PINCH_BEGIN, c.SDL_EVENT_PINCH_END },
             .clipboard => .{ c.SDL_EVENT_CLIPBOARD_UPDATE, c.SDL_EVENT_CLIPBOARD_UPDATE },
             .drag_and_drop => .{ c.SDL_EVENT_DROP_FILE, c.SDL_EVENT_DROP_POSITION },
             .audio => .{ c.SDL_EVENT_AUDIO_DEVICE_ADDED, c.SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED },
@@ -284,6 +287,8 @@ pub const Type = enum(c.SDL_EventType) {
     display_current_mode_changed = c.SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED,
     /// Display has changed content scale.
     display_content_scale_changed = c.SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED,
+    /// Display has changed usable bounds.
+    display_usable_bounds_changed = c.SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED,
     /// Window has been shown.
     window_shown = c.SDL_EVENT_WINDOW_SHOWN,
     /// Window has been hidden.
@@ -352,6 +357,10 @@ pub const Type = enum(c.SDL_EventType) {
     keyboard_removed = c.SDL_EVENT_KEYBOARD_REMOVED,
     /// Keyboard text editing candidates.
     text_editing_candidates = c.SDL_EVENT_TEXT_EDITING_CANDIDATES,
+    /// The on-screen keyboard has been shown.
+    screen_keyboard_shown = c.SDL_EVENT_SCREEN_KEYBOARD_SHOWN,
+    /// The on-screen keyboard has been hidden.
+    screen_keyboard_hidden = c.SDL_EVENT_SCREEN_KEYBOARD_HIDDEN,
     /// Mouse moved.
     mouse_motion = c.SDL_EVENT_MOUSE_MOTION,
     /// Mouse button pressed.
@@ -410,6 +419,12 @@ pub const Type = enum(c.SDL_EventType) {
     finger_up = c.SDL_EVENT_FINGER_UP,
     finger_motion = c.SDL_EVENT_FINGER_MOTION,
     finger_canceled = c.SDL_EVENT_FINGER_CANCELED,
+    /// Pinch gesture started.
+    pinch_begin = c.SDL_EVENT_PINCH_BEGIN,
+    /// Pinch gesture updated.
+    pinch_update = c.SDL_EVENT_PINCH_UPDATE,
+    /// Pinch gesture ended.
+    pinch_end = c.SDL_EVENT_PINCH_END,
     /// The clipboard or primary selection changed.
     clipboard_update = c.SDL_EVENT_CLIPBOARD_UPDATE,
     /// The system requests a file open.
@@ -1683,6 +1698,38 @@ pub const PenTouch = struct {
     }
 };
 
+/// Pinch event structure (event.pinch.*).
+///
+/// ## Version
+/// This struct is available since SDL 3.4.0.
+pub const PinchFinger = struct {
+    /// Common event information.
+    common: Common,
+    /// The scale change since the last pinch update event.
+    /// Scale < 1 is "zoom out".
+    /// Scale > 1 is "zoom in".
+    scale: f32,
+    /// The window underneath the finger, if any.
+    window_id: ?video.WindowId = null,
+
+    /// Convert from SDL.
+    pub fn fromSdl(val: c.SDL_Event) PinchFinger {
+        return .{
+            .common = Common.fromSdl(val),
+            .scale = val.pinch.scale,
+            .window_id = if (val.pinch.windowID == 0) null else val.pinch.windowID,
+        };
+    }
+
+    /// Convert to SDL.
+    pub fn toSdl(self: PinchFinger, event_type: Type) c.SDL_Event {
+        var ret = self.common.toSdl(event_type);
+        ret.pinch.scale = self.scale;
+        ret.pinch.windowID = self.window_id orelse 0;
+        return ret;
+    }
+};
+
 /// The "quit requested" event.
 ///
 /// ## Version
@@ -2096,6 +2143,7 @@ pub const WindowExposed = struct {
     common: Common,
     /// Associated window.
     id: video.WindowId,
+    /// If event was sent during live resizing.
     live_resize: bool,
 
     /// Convert from SDL.
@@ -2274,6 +2322,8 @@ pub const Event = union(Type) {
     display_current_mode_changed: Display,
     /// Display has changed content scale.
     display_content_scale_changed: Display,
+    /// Display has changed usable bounds
+    display_usable_bounds_changed: Display,
     /// Window has been shown.
     window_shown: Window,
     /// Window has been hidden.
@@ -2342,6 +2392,10 @@ pub const Event = union(Type) {
     keyboard_removed: KeyboardDevice,
     /// Keyboard text editing candidates.
     text_editing_candidates: TextEditingCandidates,
+    /// The on-screen keyboard has been shown.
+    screen_keyboard_shown: Common,
+    /// The on-screen keyboard has been hidden.
+    screen_keyboard_hidden: Common,
     /// Mouse moved.
     mouse_motion: MouseMotion,
     /// Mouse button pressed.
@@ -2400,6 +2454,12 @@ pub const Event = union(Type) {
     finger_up: TouchFinger,
     finger_motion: TouchFinger,
     finger_canceled: TouchFinger,
+    /// Pinch gesture started.
+    pinch_begin: PinchFinger,
+    /// Pinch gesture updated.
+    pinch_update: PinchFinger,
+    /// Pinch gesture ended.
+    pinch_end: PinchFinger,
     /// The clipboard or primary selection changed.
     clipboard_update: Clipboard,
     /// The system requests a file open.
@@ -2499,6 +2559,7 @@ pub const Event = union(Type) {
             c.SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED => .{ .display_desktop_mode_changed = @FieldType(Event, "display_desktop_mode_changed").fromSdl(event) },
             c.SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED => .{ .display_current_mode_changed = @FieldType(Event, "display_current_mode_changed").fromSdl(event) },
             c.SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED => .{ .display_content_scale_changed = @FieldType(Event, "display_content_scale_changed").fromSdl(event) },
+            c.SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED => .{ .display_usable_bounds_changed = @FieldType(Event, "display_usable_bounds_changed").fromSdl(event) },
             c.SDL_EVENT_WINDOW_SHOWN => .{ .window_shown = @FieldType(Event, "window_shown").fromSdl(event) },
             c.SDL_EVENT_WINDOW_HIDDEN => .{ .window_hidden = @FieldType(Event, "window_hidden").fromSdl(event) },
             c.SDL_EVENT_WINDOW_EXPOSED => .{ .window_exposed = @FieldType(Event, "window_exposed").fromSdl(event) },
@@ -2532,6 +2593,8 @@ pub const Event = union(Type) {
             c.SDL_EVENT_KEYBOARD_ADDED => .{ .keyboard_added = @FieldType(Event, "keyboard_added").fromSdl(event) },
             c.SDL_EVENT_KEYBOARD_REMOVED => .{ .keyboard_removed = @FieldType(Event, "keyboard_removed").fromSdl(event) },
             c.SDL_EVENT_TEXT_EDITING_CANDIDATES => .{ .text_editing_candidates = @FieldType(Event, "text_editing_candidates").fromSdl(event) },
+            c.SDL_EVENT_SCREEN_KEYBOARD_SHOWN => .{ .screen_keyboard_shown = @FieldType(Event, "screen_keyboard_shown").fromSdl(event) },
+            c.SDL_EVENT_SCREEN_KEYBOARD_HIDDEN => .{ .screen_keyboard_hidden = @FieldType(Event, "screen_keyboard_hidden").fromSdl(event) },
             c.SDL_EVENT_MOUSE_MOTION => .{ .mouse_motion = @FieldType(Event, "mouse_motion").fromSdl(event) },
             c.SDL_EVENT_MOUSE_BUTTON_DOWN => .{ .mouse_button_down = @FieldType(Event, "mouse_button_down").fromSdl(event) },
             c.SDL_EVENT_MOUSE_BUTTON_UP => .{ .mouse_button_up = @FieldType(Event, "mouse_button_up").fromSdl(event) },
@@ -2563,6 +2626,9 @@ pub const Event = union(Type) {
             c.SDL_EVENT_FINGER_UP => .{ .finger_up = @FieldType(Event, "finger_up").fromSdl(event) },
             c.SDL_EVENT_FINGER_MOTION => .{ .finger_motion = @FieldType(Event, "finger_motion").fromSdl(event) },
             c.SDL_EVENT_FINGER_CANCELED => .{ .finger_canceled = @FieldType(Event, "finger_canceled").fromSdl(event) },
+            c.SDL_EVENT_PINCH_BEGIN => .{ .pinch_begin = @FieldType(Event, "pinch_begin").fromSdl(event) },
+            c.SDL_EVENT_PINCH_UPDATE => .{ .pinch_update = @FieldType(Event, "pinch_update").fromSdl(event) },
+            c.SDL_EVENT_PINCH_END => .{ .pinch_end = @FieldType(Event, "pinch_end").fromSdl(event) },
             c.SDL_EVENT_CLIPBOARD_UPDATE => .{ .clipboard_update = @FieldType(Event, "clipboard_update").fromSdl(event) },
             c.SDL_EVENT_DROP_FILE => .{ .drop_file = @FieldType(Event, "drop_file").fromSdl(event) },
             c.SDL_EVENT_DROP_TEXT => .{ .drop_text = @FieldType(Event, "drop_text").fromSdl(event) },
@@ -2617,6 +2683,38 @@ pub const Event = union(Type) {
         const managed: *Event = @ptrCast(event);
         managed.* = fromSdl(event.*);
         return managed;
+    }
+
+    /// Generate an English description of an event.
+    ///
+    /// ## Function Parameters
+    /// * `self`: An event to describe.
+    /// * `allocator`: Allocator used to allocate memory for the returned event description.
+    ///
+    /// ## Return Value
+    /// Returns an owned buffer containing the English event description.
+    /// This must be freed.
+    ///
+    /// ## Remarks
+    /// The returned event description might look something like this:
+    /// `SDL_EVENT_MOUSE_MOTION (timestamp=1140256324 windowid=2 which=0 state=0 x=492.99 y=139.09 xrel=52 yrel=6)`
+    ///
+    /// The exact format of the string is not guaranteed; it is intended for logging purposes, to be read by a human, and not parsed by a computer.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getDescription(
+        self: Event,
+        allocator: std.mem.Allocator,
+    ) ![:0]u8 {
+        const c_event = self.toSdl();
+        const len = c.SDL_GetEventDescription(&c_event, null, 0);
+        const ret: [:0]u8 = try allocator.allocSentinel(u8, @intCast(len), 0);
+        _ = c.SDL_GetEventDescription(&c_event, ret.ptr, len);
+        return ret;
     }
 
     /// Get window associated with an event.
@@ -2674,6 +2772,7 @@ pub const Event = union(Type) {
             .display_desktop_mode_changed => |val| val.toSdl(.display_desktop_mode_changed),
             .display_current_mode_changed => |val| val.toSdl(.display_current_mode_changed),
             .display_content_scale_changed => |val| val.toSdl(.display_content_scale_changed),
+            .display_usable_bounds_changed => |val| val.toSdl(.display_usable_bounds_changed),
             .window_shown => |val| val.toSdl(.window_shown),
             .window_hidden => |val| val.toSdl(.window_hidden),
             .window_exposed => |val| val.toSdl(.window_exposed),
@@ -2707,6 +2806,8 @@ pub const Event = union(Type) {
             .keyboard_added => |val| val.toSdl(.keyboard_added),
             .keyboard_removed => |val| val.toSdl(.keyboard_removed),
             .text_editing_candidates => |val| val.toSdl(.text_editing_candidates),
+            .screen_keyboard_shown => |val| val.toSdl(.screen_keyboard_shown),
+            .screen_keyboard_hidden => |val| val.toSdl(.screen_keyboard_hidden),
             .mouse_motion => |val| val.toSdl(.mouse_motion),
             .mouse_button_down => |val| val.toSdl(.mouse_button_down),
             .mouse_button_up => |val| val.toSdl(.mouse_button_up),
@@ -2738,6 +2839,9 @@ pub const Event = union(Type) {
             .finger_up => |val| val.toSdl(.finger_up),
             .finger_motion => |val| val.toSdl(.finger_motion),
             .finger_canceled => |val| val.toSdl(.finger_canceled),
+            .pinch_begin => |val| val.toSdl(.pinch_begin),
+            .pinch_update => |val| val.toSdl(.pinch_update),
+            .pinch_end => |val| val.toSdl(.pinch_end),
             .clipboard_update => |val| val.toSdl(.clipboard_update),
             .drop_file => |val| val.toSdl(.drop_file),
             .drop_text => |val| val.toSdl(.drop_text),

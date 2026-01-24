@@ -1738,18 +1738,39 @@ pub const DepthStencilTargetInfo = struct {
 pub const Device = packed struct {
     value: *c.SDL_GPUDevice,
 
-    /// GPU properties.
+    /// GPU create properties.
     ///
     /// ## Version
     /// This struct is provided by zig-sdl3.
-    pub const Properties = struct {
-        /// Enable debug mode properties and validations, defaults to true.
+    pub const CreateProperties = struct {
+        /// Enable debug mode properties and validations, defaults to `true`.
         debug_mode: ?bool = null,
-        /// Enable to prefer energy efficiency over maximum GPU performance, defaults to false.
+        /// Enable to prefer energy efficiency over maximum GPU performance, defaults to `false`.
         prefer_low_power: ?bool = null,
-        // /// Enable to automatically log useful debug information on device creation, defaults to true.
-        // verbose: ?bool = null,
+        /// Enable to automatically log useful debug information on device creation, defaults to `true`.
+        verbose: ?bool = null,
+        /// The name of the GPU driver to use, if a specific one is desired.
         name: ?[:0]const u8 = null,
+        /// Enable Vulkan device feature shaderClipDistance.
+        /// If disabled, clip distances are not supported in shader code: `gl_ClipDistance[]` built-ins of GLSL, `SV_ClipDistance0/1` semantics of HLSL and `[[clip_distance]]` attribute of Metal.
+        /// Disabling optional features allows the application to run on some older Android devices.
+        /// Defaults to `true`.
+        feature_clip_distance: ?bool = null,
+        /// Enable Vulkan device feature `depthClamp`.
+        /// If disabled, there is no depth clamp support and `enable_depth_clip` in `RasterizerState` must always be set to `true`.
+        /// Disabling optional features allows the application to run on some older Android devices.
+        /// Defaults to `true`.
+        feature_depth_clamping: ?bool = null,
+        /// Enable Vulkan device feature `drawIndirectFirstInstance`.
+        /// If disabled, the argument first_instance of `SDL_GPUIndirectDrawCommand` must be set to zero.
+        /// Disabling optional features allows the application to run on some older Android devices.
+        /// Defaults to `true`.
+        feature_indirect_draw_first: ?bool = null,
+        /// Enable Vulkan device feature `samplerAnisotropy`.
+        /// If disabled,`enable_anisotropy` of `SamplerCreateInfo` must be set to `false`.
+        /// Disabling optional features allows the application to run on some older Android devices.
+        /// Defaults to `true`.
+        feature_anisotropy: ?bool = null,
         /// The app is able to provide shaders for an NDA platform.
         shaders_private: ?bool = null,
         /// The app is able to provide SPIR-V shaders if applicable.
@@ -1764,22 +1785,38 @@ pub const Device = packed struct {
         shaders_metallib: ?bool = null,
         /// The prefix to use for all vertex semantics, default is "TEXCOORD".
         d3d12_semantic_name: ?[:0]const u8 = null,
-        // vulkan_shader_clip_distance: ?bool = null,
-        // vulkan_depth_clamp: ?bool = null,
-        // vulkan_draw_indirect_first: ?bool = null,
-        // vulkan_sample_anisotropy: ?bool = null,
+        /// By default, Resourcing Binding Tier 2 is required for D3D12 support.
+        /// However, an application can set this property to true to enable Tier 1 support, if (and only if) the application uses 8 or fewer storage resources across all shader stages.
+        /// As of writing, this property is useful for targeting Intel Haswell and Broadwell GPUs; other hardware either supports Tier 2 Resource Binding or does not support D3D12 in any capacity.
+        /// Defaults to `false`.
+        d3d12_allow_fewer_resource_slots: ?bool = null,
+        /// By default, Vulkan device enumeration includes drivers of all types, including software renderers (for example, the Lavapipe Mesa driver).
+        /// This can be useful if your application requires SDL_GPU, but if you can provide your own fallback renderer (for example, an OpenGL renderer) this property can be set to `true`.
+        /// Defaults to `false`.
+        vulkan_require_hardware_acceleration: ?bool = null,
+        /// Vulkan options structure to be processed during device creation.
+        /// This allows configuring a variety of Vulkan-specific options such as increasing the API version and opting into extensions aside from the minimal set SDL requires.
+        vulkan_options: ?*const VulkanOptions = null,
 
         /// Convert to SDL.
-        pub fn toProperties(self: Properties) !properties.Group {
+        pub fn toProperties(self: CreateProperties) !properties.Group {
             const ret = try properties.Group.init();
             if (self.debug_mode) |val|
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, .{ .boolean = val });
             if (self.prefer_low_power) |val|
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN, .{ .boolean = val });
-            // if (self.verbose) |val|
-            //     try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_VERBOSE_BOOLEAN, .{ .boolean = val });
+            if (self.verbose) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_VERBOSE_BOOLEAN, .{ .boolean = val });
             if (self.name) |val|
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, .{ .string = val });
+            if (self.feature_clip_distance) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN, .{ .boolean = val });
+            if (self.feature_depth_clamping) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_FEATURE_DEPTH_CLAMPING_BOOLEAN, .{ .boolean = val });
+            if (self.feature_indirect_draw_first) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_FEATURE_INDIRECT_DRAW_FIRST_INSTANCE_BOOLEAN, .{ .boolean = val });
+            if (self.feature_anisotropy) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_FEATURE_ANISOTROPY_BOOLEAN, .{ .boolean = val });
             if (self.shaders_private) |val|
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_SHADERS_PRIVATE_BOOLEAN, .{ .boolean = val });
             if (self.shaders_spirv) |val|
@@ -1794,9 +1831,99 @@ pub const Device = packed struct {
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN, .{ .boolean = val });
             if (self.d3d12_semantic_name) |val|
                 try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_D3D12_SEMANTIC_NAME_STRING, .{ .string = val });
-            // if (self.vulkan_shader_clip_distance) |val|
-            //     try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_VULKAN_SHADERCLIPDISTANCE_BOOLEAN, .{ .boolean = val });
+            if (self.d3d12_allow_fewer_resource_slots) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_D3D12_ALLOW_FEWER_RESOURCE_SLOTS_BOOLEAN, .{ .boolean = val });
+            if (self.vulkan_require_hardware_acceleration) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_VULKAN_REQUIRE_HARDWARE_ACCELERATION_BOOLEAN, .{ .boolean = val });
+            if (self.vulkan_options) |val|
+                try ret.set(c.SDL_PROP_GPU_DEVICE_CREATE_VULKAN_OPTIONS_POINTER, .{ .pointer = @ptrCast(@constCast(val)) });
             return ret;
+        }
+    };
+
+    /// GPU properties.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const Properties = struct {
+        /// Contains the name of the underlying device as reported by the system driver.
+        /// This string has no standardized format, is highly inconsistent between hardware devices and drivers, and is able to change at any time.
+        /// Do not attempt to parse this string as it is bound to fail at some point in the future when system drivers are updated,
+        /// new hardware devices are introduced, or when SDL adds new GPU backends or modifies existing ones.
+        ///
+        /// Strings that have been found in the wild include:
+        /// * GTX 970
+        /// * GeForce GTX 970
+        /// * NVIDIA GeForce GTX 970
+        /// * Microsoft Direct3D12 (NVIDIA GeForce GTX 970)
+        /// * NVIDIA Graphics Device
+        /// * GeForce GPU
+        /// * P106-100
+        /// * AMD 15D8:C9
+        /// * AMD Custom GPU 0405
+        /// * AMD Radeon (TM) Graphics
+        /// * ASUS Radeon RX 470 Series
+        /// * Intel(R) Arc(tm) A380 Graphics (DG2)
+        /// * Virtio-GPU Venus (NVIDIA TITAN V)
+        /// * SwiftShader Device (LLVM 16.0.0)
+        /// * llvmpipe (LLVM 15.0.4, 256 bits)
+        /// * Microsoft Basic Render Driver
+        /// * unknown device
+        ///
+        /// The above list shows that the same device can have different formats, the vendor name may or may not appear in the string,
+        /// the included vendor name may not be the vendor of the chipset on the device, some manufacturers include pseudo-legal marks while others don't,
+        /// some devices may not use a marketing name in the string, the device string may be wrapped by the name of a translation interface, the device may be emulated in software,
+        /// or the string may contain generic text that does not identify the device at all.
+        name: ?[:0]const u8 = null,
+        /// Contains the self-reported name of the underlying system driver.
+        ///
+        /// Strings that have been found in the wild include:
+        /// * Intel Corporation
+        /// * Intel open-source Mesa driver
+        /// * Qualcomm Technologies Inc. Adreno Vulkan Driver
+        /// * MoltenVK
+        /// * Mali-G715
+        /// * venus
+        device_driver_name: ?[:0]const u8 = null,
+        /// Contains the self-reported version of the underlying system driver.
+        /// This is a relatively short version string in an unspecified format.
+        /// If `device_driver_info` is available then that property should be preferred over this one as it may contain additional information that is useful
+        /// for identifying the exact driver version used.
+        ///
+        /// Strings that have been found in the wild include:
+        /// * 53.0.0
+        /// * 0.405.2463
+        /// * 32.0.15.6614
+        device_driver_version: ?[:0]const u8 = null,
+        /// Contains the detailed version information of the underlying system driver as reported by the driver.
+        /// This is an arbitrary string with no standardized format and it may contain newlines.
+        /// This property should be preferred over `device_driver_version` if it is available as it usually contains the same information
+        /// but in a format that is easier to read.
+        ///
+        /// Strings that have been found in the wild include:
+        /// * 101.6559
+        /// * 1.2.11
+        /// * Mesa 21.2.2 (LLVM 12.0.1)
+        /// * Mesa 22.2.0-devel (git-f226222 2022-04-14 impish-oibaf-ppa)
+        /// * v1.r53p0-00eac0.824c4f31403fb1fbf8ee1042422c2129
+        ///
+        /// This string has also been observed to be a multiline string (which has a trailing newline):
+        /// ```
+        /// Driver Build: 85da404, I46ff5fc46f, 1606794520
+        /// Date: 11/30/20
+        /// Compiler Version: EV031.31.04.01
+        /// Driver Branch: promo490_3_Google
+        /// ```
+        device_driver_info: ?[:0]const u8 = null,
+
+        /// Convert from an SDL value.
+        pub fn fromSdl(value: properties.Group) Properties {
+            return .{
+                .name = if (value.get(c.SDL_PROP_GPU_DEVICE_NAME_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
+                .device_driver_name = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
+                .device_driver_version = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
+                .device_driver_info = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_INFO_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
+            };
         }
     };
 
@@ -2090,17 +2217,6 @@ pub const Device = packed struct {
     ///
     /// If you request a sample count higher than the hardware supports, the implementation will automatically fall back to the highest available sample count.
     ///
-    /// There are optional properties that can be provided through `gpu.TextureCreateInfo`'s `props`.
-    /// These are the supported properties:
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_R_FLOAT`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_COLOR_TARGET, clear the texture to a color with this red intensity. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_G_FLOAT`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_COLOR_TARGET, clear the texture to a color with this green intensity. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_B_FLOAT`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_COLOR_TARGET, clear the texture to a color with this blue intensity. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_A_FLOAT`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_COLOR_TARGET, clear the texture to a color with this alpha intensity. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET, clear the texture to a depth of this value. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER`: (Direct3D 12 only) if the texture usage is SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET, clear the texture to a stencil of this Uint8 value. Defaults to zero.
-    /// * `SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING`: a name that can be displayed in debugging tools.
-    /// TODO: PROPERLY HANDLE PROPERTIES!!!
-    ///
     /// ## Version
     /// This function is available since SDL 3.2.0.
     pub fn createTexture(
@@ -2218,17 +2334,28 @@ pub const Device = packed struct {
         ));
     }
 
-    // Does not exist until SDL 3.4.0.
-    // /// Get the properties associated with a GPU device.
-    // ///
-    // /// TODO: DOCS AND PROPER PROPERTIES!!!
-    // pub fn getProperties(
-    //     self: Device,
-    // ) !properties.Group {
-    //     return .{
-    //         .value = try errors.wrapCall(c.SDL_PropertiesID, c.SDL_GetGPUDeviceProperties(self.value), 0),
-    //     };
-    // }
+    /// Get the properties associated with a GPU device.
+    ///
+    /// ## Function Parameters
+    /// * `device`: A GPU context to query.
+    ///
+    /// ## Return Value
+    /// Returns the device properties.
+    ///
+    /// ## Remarks
+    /// All properties are optional and may differ between GPU backends and SDL versions.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getProperties(
+        self: Device,
+    ) !Properties {
+        const ret = c.SDL_GetGPUDeviceProperties(self.value);
+        return Properties.fromSdl(properties.Group{ .value = try errors.wrapCall(c.SDL_PropertiesID, ret, 0) });
+    }
 
     /// Returns the supported shader formats for this GPU context.
     ///
@@ -2319,7 +2446,7 @@ pub const Device = packed struct {
     /// ## Version
     /// This function is available since SDL 3.2.0.
     pub fn initWithProperties(
-        props: Properties,
+        props: CreateProperties,
     ) !Device {
         const group = try props.toProperties();
         defer group.deinit();
@@ -4550,6 +4677,21 @@ pub const TextureFormat = enum(c.SDL_GPUTextureFormat) {
     astc_12x10_float_compressed = c.SDL_GPU_TEXTUREFORMAT_ASTC_12x10_FLOAT,
     astc_12x12_float_compressed = c.SDL_GPU_TEXTUREFORMAT_ASTC_12x12_FLOAT,
 
+    /// Convert from an SDL value.
+    pub fn fromSdl(
+        value: c.SDL_GPUTextureFormat,
+    ) ?TextureFormat {
+        if (value == c.SDL_GPU_TEXTUREFORMAT_INVALID) {
+            return null;
+        }
+        return @enumFromInt(value);
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(self: TextureFormat) c.SDL_GPUTextureFormat {
+        return @intFromEnum(self);
+    }
+
     /// Calculate the size in bytes of a texture format with dimensions.
     ///
     /// ## Function Parameters
@@ -4575,6 +4717,38 @@ pub const TextureFormat = enum(c.SDL_GPUTextureFormat) {
             height,
             depth_or_layer_count,
         );
+    }
+
+    /// Get the GPU texture format corresponding to an SDL pixel format.
+    ///
+    /// ## Function Parameters
+    /// * `format`: A pixel format.
+    ///
+    /// ## Return Value
+    /// Returns the corresponding GPU texture format if `null`.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn fromPixelFormat(
+        format: pixels.Format,
+    ) ?TextureFormat {
+        return TextureFormat.fromSdl(c.SDL_GetGPUTextureFormatFromPixelFormat(pixels.Format.toSdl(format)));
+    }
+
+    /// Get the SDL pixel format corresponding to a GPU texture format.
+    ///
+    /// ## Function Parameters
+    /// * `self`: A texture format.
+    ///
+    /// ## Return Value
+    /// Returns the corresponding pixel format, or `null` if there is no corresponding pixel format.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getPixelFormat(
+        self: TextureFormat,
+    ) ?pixels.Format {
+        return pixels.Format.fromSdl(c.SDL_GetPixelFormatFromGPUTextureFormat(self.toSdl()));
     }
 
     /// Obtains the texel block size for a texture format.
@@ -4717,11 +4891,7 @@ pub const TextureSamplerBinding = extern struct {
 
     // Size tests.
     comptime {
-        std.debug.assert(@sizeOf(c.SDL_GPUTextureSamplerBinding) == @sizeOf(TextureSamplerBinding));
-        std.debug.assert(@sizeOf(@FieldType(c.SDL_GPUTextureSamplerBinding, "texture")) == @sizeOf(@FieldType(TextureSamplerBinding, "texture")));
-        std.debug.assert(@offsetOf(c.SDL_GPUTextureSamplerBinding, "texture") == @offsetOf(TextureSamplerBinding, "texture"));
-        std.debug.assert(@sizeOf(@FieldType(c.SDL_GPUTextureSamplerBinding, "sampler")) == @sizeOf(@FieldType(TextureSamplerBinding, "sampler")));
-        std.debug.assert(@offsetOf(c.SDL_GPUTextureSamplerBinding, "sampler") == @offsetOf(TextureSamplerBinding, "sampler"));
+        errors.assertStructsEqual(TextureSamplerBinding, c.SDL_GPUTextureSamplerBinding);
     }
 };
 
@@ -5161,6 +5331,43 @@ pub const Viewport = struct {
     }
 };
 
+/// A structure specifying additional options when using Vulkan.
+///
+/// ## Remarks
+/// When no such structure is provided, SDL will use Vulkan API version 1.0 and a minimal set of features.
+/// The requested API version influences how the `feature_list` is processed by SDL.
+/// When requesting API version 1.0, the `feature_list` is ignored.
+/// Only the `vulkan_10_physical_device_features` and the extension lists are used.
+/// When requesting API version 1.1, the feature_list is scanned for feature structures introduced in Vulkan 1.1.
+/// When requesting Vulkan 1.2 or higher, the `feature_list` is additionally scanned for compound feature structs such as `VkPhysicalDeviceVulkan11Features`.
+/// The device and instance extension lists, as well as `vulkan_10_physical_device_features`, are always processed.
+///
+/// ## Version
+/// This struct is available since SDL 3.4.0.
+pub const VulkanOptions = extern struct {
+    /// The Vulkan API version to request for the instance.
+    /// Use Vulkan's `VK_MAKE_VERSION` or `VK_MAKE_API_VERSION`.
+    vulkan_api_version: u32,
+    /// Pointer to the first element of a chain of Vulkan feature structs.
+    /// (Requires API version 1.1 or higher).
+    feature_list: *const anyopaque,
+    /// Pointer to a `VkPhysicalDeviceFeatures` struct to enable additional Vulkan 1.0 features.
+    vulkan_10_physical_device_features: *const anyopaque,
+    /// Number of additional device extensions to require.
+    device_extension_count: u32,
+    /// Pointer to a list of additional device extensions to require.
+    device_extension_names: [*][*:0]const u8,
+    /// Number of additional instance extensions to require.
+    instance_extension_count: u32,
+    /// Pointer to a list of additional instance extensions to require.
+    instance_extension_names: [*][*:0]const u8,
+
+    // Size tests.
+    comptime {
+        errors.assertStructsEqual(VulkanOptions, c.SDL_GPUVulkanOptions);
+    }
+};
+
 /// Get the name of a built in GPU driver.
 ///
 /// ## Function Parameters
@@ -5206,7 +5413,7 @@ pub fn getNumDrivers() usize {
 /// ## Version
 /// This function is available since SDL 3.2.0.
 pub fn supportsProperties(
-    props: Device.Properties,
+    props: Device.CreateProperties,
 ) !bool {
     const group = try props.toProperties();
     defer group.deinit();

@@ -27,6 +27,39 @@ pub fn HitTest(comptime UserData: type) type {
     ) HitTestResult;
 }
 
+/// Window progress state.
+///
+/// ## Version
+/// This enum is available since SDL 3.2.8.
+pub const ProgressState = enum(c.SDL_ProgressState) {
+    /// The progress bar is shown in a indeterminate state.
+    indeterminate,
+    /// The progress bar is shown in a normal state.
+    normal,
+    /// The progress bar is shown in a paused state.
+    paused,
+    /// The progress bar is shown in a state indicating the application had an error.
+    err,
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(value: c.SDL_ProgressState) !?ProgressState {
+        if (value == c.SDL_PROGRESS_STATE_INVALID) {
+            errors.callErrorCallback();
+            return error.SdlError;
+        }
+        if (value == c.SDL_PROGRESS_STATE_NONE)
+            return null;
+        return @enumFromInt(value);
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(self: ?ProgressState) c.SDL_ProgressState {
+        if (self) |val|
+            return @intFromEnum(val);
+        return c.SDL_PROGRESS_STATE_NONE;
+    }
+};
+
 /// System theme.
 ///
 /// ## Version
@@ -174,12 +207,18 @@ pub const Display = packed struct {
         /// The "panel orientation" property for the display in degrees of clockwise rotation.
         /// Note that this is provided only as a hint, and the application is responsible for any coordinate transformations needed to conform to the requested display orientation.
         kmsdrm_panel_orientation: ?i64,
+        /// The `wl_output` associated with the display.
+        wayland_wl_output: ?struct { value: ?*anyopaque },
+        /// The monitor handle (`HMONITOR`) associated with the display.
+        windows_hmonitor: ?struct { value: ?*anyopaque },
 
         /// Get properties from SDL.
         pub fn fromSdl(props: properties.Group) Properties {
             return .{
                 .hdr_enabled = if (props.get(c.SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN)) |val| val.boolean else null,
                 .kmsdrm_panel_orientation = if (props.get(c.SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER)) |val| val.number else null,
+                .wayland_wl_output = if (props.get(c.SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER)) |val| .{ .value = val.pointer } else null,
+                .windows_hmonitor = if (props.get(c.SDL_PROP_DISPLAY_WINDOWS_HMONITOR_POINTER)) |val| .{ .value = val.pointer } else null,
             };
         }
     };
@@ -1333,11 +1372,14 @@ pub const Window = packed struct {
         /// The y position of the window.
         y: ?Position = null,
         /// MacOS only.
-        /// The (`__unsafe_unretained`) `NSWindow` associated with the window, if you want to wrap an existing window.
+        /// The (`__unsafe_unretained) NSWindow` associated with the window, if you want to wrap an existing window.
         cocoa_window: ?struct { value: ?*anyopaque } = null,
         /// MacOS only.
-        /// The (`__unsafe_unretained`) `NSView` associated  the window, defaults to `[window contentView]`
+        /// The (`__unsafe_unretained) NSView` associated  the window, defaults to `[window contentView]`
         cocoa_view: ?struct { value: ?*anyopaque } = null,
+        /// The `(__unsafe_unretained) UIWindowScene` associated with the window, defaults to the active window scene.
+        /// For iOS, tvOS, and visionOS.
+        window_scene: ?struct { value: ?*anyopaque },
         /// Wayland only.
         /// True if the application wants to use the Wayland surface for a custom role and does not want it attached to an XDG toplevel window.
         /// See SDL3's README/wayland for more information on using custom surfaces.
@@ -1359,6 +1401,20 @@ pub const Window = packed struct {
         /// x11 only.
         /// The X11 Window associated with the window, if you want to wrap an existing window.
         x11_window: ?i64 = null,
+        /// The id given to the canvas element.
+        /// This should start with a `#` sign.
+        emscripten_canvas_id: ?[:0]const u8 = null,
+        /// Override the binding element for keyboard inputs for this canvas.
+        /// The variable can be one of:
+        /// * `#window`: The javascript window object (default).
+        /// * `#document`: The javascript document object.
+        /// * `#screen`: The javascript window.screen object.
+        /// * `#canvas`: The WebGL canvas element.
+        /// * `#none`: Don't bind anything at all.
+        ///
+        /// Any other string without a leading `#` sign applies to the element on the page with that ID.
+        /// Windows with the "tooltip" and "menu" properties are popup windows and have the behaviors and guidelines outlined in `Window.createPopup()`.
+        emscripten_keyboard_element: ?[:0]const u8 = null,
 
         /// Create SDL3 properties from this properties structure.
         ///
@@ -1421,6 +1477,8 @@ pub const Window = packed struct {
                 try ret.set(c.SDL_PROP_WINDOW_CREATE_COCOA_WINDOW_POINTER, .{ .pointer = val.value });
             if (self.cocoa_view) |val|
                 try ret.set(c.SDL_PROP_WINDOW_CREATE_COCOA_VIEW_POINTER, .{ .pointer = val.value });
+            if (self.window_scene) |val|
+                try ret.set(c.SDL_PROP_WINDOW_CREATE_WINDOWSCENE_POINTER, .{ .pointer = val.value });
             if (self.wayland_surface_role_custom) |val|
                 try ret.set(c.SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN, .{ .boolean = val });
             if (self.wayland_create_egl_window) |val|
@@ -1433,6 +1491,10 @@ pub const Window = packed struct {
                 try ret.set(c.SDL_PROP_WINDOW_CREATE_WIN32_PIXEL_FORMAT_HWND_POINTER, .{ .pointer = val.value });
             if (self.x11_window) |val|
                 try ret.set(c.SDL_PROP_WINDOW_CREATE_X11_WINDOW_NUMBER, .{ .number = @intCast(val) });
+            if (self.emscripten_canvas_id) |val|
+                try ret.set(c.SDL_PROP_WINDOW_CREATE_EMSCRIPTEN_CANVAS_ID_STRING, .{ .string = val });
+            if (self.emscripten_keyboard_element) |val|
+                try ret.set(c.SDL_PROP_WINDOW_CREATE_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING, .{ .string = val });
             return ret;
         }
     };
@@ -1491,6 +1553,8 @@ pub const Window = packed struct {
         popup_menu: bool = false,
         /// Window has grabbed keyboard input.
         keyboard_grabbed: bool = false,
+        /// Window is in fill-document mode (Emscripten only), since SDL 3.4.0.
+        fill_document: bool = false,
         /// Window usable for Vulkan surface.
         vulkan: bool = false,
         /// Window usable for Metal view.
@@ -1524,6 +1588,7 @@ pub const Window = packed struct {
                 .tooltip = (flags & c.SDL_WINDOW_TOOLTIP) != 0,
                 .popup_menu = (flags & c.SDL_WINDOW_POPUP_MENU) != 0,
                 .keyboard_grabbed = (flags & c.SDL_WINDOW_KEYBOARD_GRABBED) != 0,
+                .fill_document = (flags & c.SDL_WINDOW_FILL_DOCUMENT) != 0,
                 .vulkan = (flags & c.SDL_WINDOW_VULKAN) != 0,
                 .metal = (flags & c.SDL_WINDOW_METAL) != 0,
                 .transparent = (flags & c.SDL_WINDOW_TRANSPARENT) != 0,
@@ -1554,6 +1619,7 @@ pub const Window = packed struct {
                 (if (self.tooltip) @as(c.SDL_WindowFlags, c.SDL_WINDOW_TOOLTIP) else 0) |
                 (if (self.popup_menu) @as(c.SDL_WindowFlags, c.SDL_WINDOW_POPUP_MENU) else 0) |
                 (if (self.keyboard_grabbed) @as(c.SDL_WindowFlags, c.SDL_WINDOW_KEYBOARD_GRABBED) else 0) |
+                (if (self.fill_document) @as(c.SDL_WindowFlags, c.SDL_WINDOW_FILL_DOCUMENT) else 0) |
                 (if (self.vulkan) @as(c.SDL_WindowFlags, c.SDL_WINDOW_VULKAN) else 0) |
                 (if (self.metal) @as(c.SDL_WindowFlags, c.SDL_WINDOW_METAL) else 0) |
                 (if (self.transparent) @as(c.SDL_WindowFlags, c.SDL_WINDOW_TRANSPARENT) else 0) |
@@ -1668,6 +1734,10 @@ pub const Window = packed struct {
         x11_screen: ?i64,
         /// The X11 Window associated with the window.
         x11_window: ?i64,
+        /// The id the canvas element will have.
+        emscripten_canvas_id: ?[:0]const u8 = null,
+        /// The keyboard element that associates keyboard events to this window.
+        emscripten_keyboard_element: ?[:0]const u8 = null,
 
         /// Convert from an SDL value.
         pub fn fromSdl(value: properties.Group) Properties {
@@ -1707,6 +1777,8 @@ pub const Window = packed struct {
                 .x11_display = if (value.get(c.SDL_PROP_WINDOW_X11_DISPLAY_POINTER)) |val| .{ .value = val.pointer } else null,
                 .x11_screen = if (value.get(c.SDL_PROP_WINDOW_X11_SCREEN_NUMBER)) |val| val.number else null,
                 .x11_window = if (value.get(c.SDL_PROP_WINDOW_X11_WINDOW_NUMBER)) |val| val.number else null,
+                .emscripten_canvas_id = if (value.get(c.SDL_PROP_WINDOW_EMSCRIPTEN_CANVAS_ID_STRING)) |val| val.string else null,
+                .emscripten_keyboard_element = if (value.get(c.SDL_PROP_WINDOW_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING)) |val| val.string else null,
             };
         }
     };
@@ -2588,6 +2660,44 @@ pub const Window = packed struct {
         return ret;
     }
 
+    /// Get the state of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window to get the current progress state from.
+    ///
+    /// ## Return Value
+    /// Returns the progress state.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getWindowProgressState(
+        self: Window,
+    ) !?ProgressState {
+        return ProgressState.fromSdl(c.SDL_GetWindowProgressState(self.value));
+    }
+
+    /// Get the value of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window to get the current progress value from.
+    ///
+    /// ## Return Value
+    /// Returns the progress value in the range of `[0, 1]`.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn getWindowProgressValue(
+        self: Window,
+    ) !f32 {
+        return errors.wrapCall(f32, c.SDL_GetWindowProgressValue(self.value), -1);
+    }
+
     /// Hide a window.
     ///
     /// ## Function Parameters
@@ -2793,6 +2903,37 @@ pub const Window = packed struct {
     ) !void {
         const ret = c.SDL_SetWindowBordered(self.value, bordered);
         return errors.wrapCallBool(ret);
+    }
+
+    /// Set the window to fill the current document space (Emscripten only).
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window of which to change the fill-document state.
+    /// * `fill`: True to set the window to fill the document, false to disable.
+    ///
+    /// ## Remarks
+    /// This will add or remove the window's `fill_document` flag.
+    ///
+    /// Currently this flag only applies to the Emscripten target.
+    ///
+    /// When enabled, the canvas element fills the entire document.
+    /// Resize events will be generated as the browser window is resized, as that will adjust the canvas size as well.
+    /// The canvas will cover anything else on the page, including any controls provided by Emscripten in its generated HTML file
+    /// (in fact, any elements on the page that aren't the canvas will be moved into a hidden div element).
+    ///
+    /// Often times this is desirable for a browser-based game, but it means several things that we expect of an SDL window on other platforms might not work as expected,
+    /// such as minimum window sizes and aspect ratios.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setFillDocument(
+        self: Window,
+        fill: bool,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetWindowFillDocument(self.value, fill));
     }
 
     /// Set whether the window may have input focus.
@@ -3184,6 +3325,42 @@ pub const Window = packed struct {
             y.toSdl(),
         );
         return errors.wrapCallBool(ret);
+    }
+
+    /// Sets the state of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window whose progress state is to be modified.
+    /// * `state`: The progress state, `null` stops displaying the progress bar.
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setProgressState(
+        self: Window,
+        state: ?ProgressState,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetWindowProgressState(self.value, ProgressState.toSdl(state)));
+    }
+
+    /// Sets the value of the progress bar for the given window’s taskbar icon.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The window whose progress value is to be modified.
+    /// * `value`: The progress value in the range of `[0, 1]`. If the value is outside the valid range, it gets clamped
+    ///
+    /// ## Thread Safety
+    /// This function should only be called on the main thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.4.0.
+    pub fn setProgressValue(
+        self: Window,
+        value: f32,
+    ) !void {
+        return errors.wrapCallBool(c.SDL_SetWindowProgressValue(self.value, value));
     }
 
     /// Set the user-resizable state of a window.

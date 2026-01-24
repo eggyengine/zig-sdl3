@@ -272,6 +272,32 @@ pub const Spinlock = extern struct {
 pub const U32 = struct {
     value: c.SDL_AtomicU32,
 
+    /// Add to an atomic variable.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The atomic variable to be modified.
+    /// * `v`: The desired value to add or subtract.
+    ///
+    /// ## Return Value
+    /// Returns the previous value of the atomic variable.
+    ///
+    /// ## Remarks
+    /// This function also acts as a full memory barrier.
+    ///
+    /// Note: If you don't know what this function is for, you shouldn't use it!
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn add(
+        self: *U32,
+        v: c_int,
+    ) u32 {
+        return c.SDL_AddAtomicU32(&self.value, v);
+    }
+
     /// Set an atomic variable to a new value if it is currently an old value.
     ///
     /// ## Function Parameters
