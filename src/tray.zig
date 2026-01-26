@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 const surface = @import("surface.zig");
 
@@ -67,9 +68,9 @@ pub const Entry = struct {
     /// This function is available since SDL 3.2.0.
     pub fn createSubmenu(
         self: Entry,
-    ) Menu {
+    ) !Menu {
         return .{
-            .value = c.SDL_CreateTraySubmenu(self.value).?,
+            .value = try errors.wrapCallNull(*c.SDL_TrayMenu, c.SDL_CreateTraySubmenu(self.value)),
         };
     }
 
@@ -229,7 +230,7 @@ pub const Entry = struct {
                 user_data_c: ?*anyopaque,
                 entry_c: ?*c.SDL_TrayEntry,
             ) callconv(.c) void {
-                callback(@alignCast(@ptrCast(user_data_c)), .{ .value = entry_c.? });
+                callback(@ptrCast(@alignCast(user_data_c)), .{ .value = entry_c.? });
             }
         };
         c.SDL_SetTrayEntryCallback(self.value, Cb.run, user_data);
@@ -500,9 +501,9 @@ pub const Tray = struct {
     /// This function is available since SDL 3.2.0.
     pub fn createMenu(
         self: Tray,
-    ) Menu {
+    ) !Menu {
         return .{
-            .value = c.SDL_CreateTrayMenu(self.value).?,
+            .value = try errors.wrapCallNull(*c.SDL_TrayMenu, c.SDL_CreateTrayMenu(self.value)),
         };
     }
 
@@ -598,11 +599,11 @@ pub const Tray = struct {
     pub fn init(
         icon: ?surface.Surface,
         tooltip: ?[:0]const u8,
-    ) Tray {
-        return .{ .value = c.SDL_CreateTray(
+    ) !Tray {
+        return .{ .value = try errors.wrapCallNull(*c.SDL_Tray, c.SDL_CreateTray(
             if (icon) |val| val.value else null,
             if (tooltip) |val| val.ptr else null,
-        ).? };
+        )) };
     }
 
     /// Updates the system tray icon's tooltip.

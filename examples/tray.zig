@@ -71,9 +71,9 @@ pub fn main() !void {
     defer state.surface.deinit();
 
     // Create tray and menu.
-    const tray = sdl3.tray.Tray.init(state.surface, "SDL3 Tray Example");
+    const tray = try sdl3.tray.Tray.init(state.surface, "SDL3 Tray Example");
     defer tray.deinit();
-    const menu = tray.createMenu();
+    const menu = try tray.createMenu();
     try std.testing.expectEqual(menu, tray.getMenu());
 
     // Main menu.
@@ -98,7 +98,7 @@ pub fn main() !void {
 
     // Create a sub-menu button at the top.
     const sub_menu = menu.insertAt(0, "Sub Menu", .{ .entry = .{ .submenu = {} } }).?;
-    const sub_menu_menu = sub_menu.createSubmenu();
+    const sub_menu_menu = try sub_menu.createSubmenu();
     try std.testing.expectEqual(sub_menu.getSubmenu(), sub_menu_menu);
 
     // Create a quit button at the bottom.
