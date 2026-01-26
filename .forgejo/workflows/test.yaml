@@ -23,9 +23,9 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Documentation Linux
-        run: zig build docs -Dtarget=x86_64-linux-gnu
+        run: zig build docs -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true
       - name: Build Documentation Windows
-        run: zig build docs -Dtarget=x86_64-windows
+        run: zig build docs -Dtarget=x86_64-windows -Dext_image=true -Dext_net=true -Dext_ttf=true
   examples:
     name: Build Examples
     runs-on: docker
@@ -35,9 +35,9 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Examples Linux
-        run: zig build examples -Dtarget=x86_64-linux-gnu
+        run: zig build examples -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true
       - name: Build Examples Windows
-        run: zig build examples -Dtarget=x86_64-windows
+        run: zig build examples -Dtarget=x86_64-windows -Dext_image=true -Dext_net=true -Dext_ttf=true
   template:
     name: Build Template
     runs-on: docker
