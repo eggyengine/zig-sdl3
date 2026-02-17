@@ -28,13 +28,13 @@ pub fn setup(
     });
 
     if (system_include_path) |val| {
-        lib.addSystemIncludePath(val);
+        lib.root_module.addSystemIncludePath(val);
     }
 
     translate_c.addIncludePath(upstream.path("include"));
-    lib.addIncludePath(upstream.path("include"));
-    lib.addIncludePath(upstream.path("src"));
-    lib.addCSourceFiles(.{
+    lib.root_module.addIncludePath(upstream.path("include"));
+    lib.root_module.addIncludePath(upstream.path("src"));
+    lib.root_module.addCSourceFiles(.{
         .root = upstream.path("src"),
         .files = srcs,
     });
@@ -44,7 +44,7 @@ pub fn setup(
             .target = target,
             .optimize = optimize,
         });
-        lib.linkLibrary(harfbuzz_dep.artifact("harfbuzz"));
+        lib.root_module.linkLibrary(harfbuzz_dep.artifact("harfbuzz"));
         lib.root_module.addCMacro("TTF_USE_HARFBUZZ", "1");
     }
 
@@ -52,9 +52,9 @@ pub fn setup(
         .target = target,
         .optimize = optimize,
     });
-    lib.linkLibrary(freetype_dep.artifact("freetype"));
+    lib.root_module.linkLibrary(freetype_dep.artifact("freetype"));
 
-    lib.linkLibrary(sdl_dep_lib);
+    lib.root_module.linkLibrary(sdl_dep_lib);
     lib.installHeadersDirectory(upstream.path("include"), "", .{});
 
     b.installArtifact(lib);

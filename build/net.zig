@@ -32,7 +32,7 @@ pub fn setup(
     });
 
     if (system_include_path) |val| {
-        lib.addSystemIncludePath(val);
+        lib.root_module.addSystemIncludePath(val);
     }
 
     var lib_c_flags: std.ArrayListUnmanaged([]const u8) = .empty;
