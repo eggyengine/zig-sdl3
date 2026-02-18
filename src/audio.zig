@@ -123,9 +123,9 @@ pub const Format = enum(c.SDL_AudioFormat) {
     floating_32_bit_big_endian = c.SDL_AUDIO_F32BE,
     _,
 
-    const signed_16_bit: Format = @enumFromInt(c.SDL_AUDIO_S16);
-    const signed_32_bit: Format = @enumFromInt(c.SDL_AUDIO_S32);
-    const floating_32_bit: Format = @enumFromInt(c.SDL_AUDIO_F32);
+    pub const signed_16_bit: Format = @enumFromInt(c.SDL_AUDIO_S16);
+    pub const signed_32_bit: Format = @enumFromInt(c.SDL_AUDIO_S32);
+    pub const floating_32_bit: Format = @enumFromInt(c.SDL_AUDIO_F32);
 
     /// Define an audio format.
     ///
