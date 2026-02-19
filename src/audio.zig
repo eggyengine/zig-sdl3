@@ -123,9 +123,9 @@ pub const Format = enum(c.SDL_AudioFormat) {
     floating_32_bit_big_endian = c.SDL_AUDIO_F32BE,
     _,
 
-    const signed_16_bit: Format = @enumFromInt(c.SDL_AUDIO_S16);
-    const signed_32_bit: Format = @enumFromInt(c.SDL_AUDIO_S32);
-    const floating_32_bit: Format = @enumFromInt(c.SDL_AUDIO_F32);
+    pub const signed_16_bit: Format = @enumFromInt(c.SDL_AUDIO_S16);
+    pub const signed_32_bit: Format = @enumFromInt(c.SDL_AUDIO_S32);
+    pub const floating_32_bit: Format = @enumFromInt(c.SDL_AUDIO_F32);
 
     /// Define an audio format.
     ///
@@ -1465,6 +1465,35 @@ pub const Stream = packed struct {
         return errors.wrapCallBool(c.SDL_PauseAudioStreamDevice(self.value));
     }
 
+    /// Get converted/resampled data from the stream.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The stream the audio is being requested from.
+    /// * `buf`: The buffer to fill with audio data.
+    ///
+    /// ## Return Value
+    /// Returns the data actually filled.
+    /// Note that the returned `ret` reuses `data.ptr`, just that `ret.len <= data.len`.
+    ///
+    /// ## Remarks
+    /// The input/output data format/channels/samplerate is specified when creating the stream, and can be changed after creation by calling `audio.Stream.setFormat()`
+    ///
+    /// Note that any conversion and resampling necessary is done during this call, and `audio.Stream.putData()` simply queues unconverted data for later.
+    /// This is different than SDL2, where that work was done while inputting new data to the stream and requesting the output just copied the converted data.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread, but if the stream has a callback set, the caller might need to manage extra locking.
+    ///
+    /// ## Version
+    /// This function is available since SDL 3.2.0.
+    pub fn getData(
+        self: Stream,
+        data: []u8,
+    ) ![]u8 {
+        const ret = try errors.wrapCall(c_int, c.SDL_GetAudioStreamData(self.value, data.ptr, @intCast(data.len)), -1);
+        return data.ptr[0..@intCast(ret)];
+    }
+
     /// Add data to the stream.
     ///
     /// ## Function Parameters
@@ -2028,35 +2057,6 @@ pub const Spec = struct {
             &dst_len,
         ));
         return dst_data[0..@intCast(dst_len)];
-    }
-
-    /// Get converted/resampled data from the stream.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The stream the audio is being requested from.
-    /// * `buf`: The buffer to fill with audio data.
-    ///
-    /// ## Return Value
-    /// Returns the data actually filled.
-    /// Note that the returned `ret` reuses `data.ptr`, just that `ret.len <= data.len`.
-    ///
-    /// ## Remarks
-    /// The input/output data format/channels/samplerate is specified when creating the stream, and can be changed after creation by calling `audio.Stream.setFormat()`
-    ///
-    /// Note that any conversion and resampling necessary is done during this call, and `audio.Stream.putData()` simply queues unconverted data for later.
-    /// This is different than SDL2, where that work was done while inputting new data to the stream and requesting the output just copied the converted data.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread, but if the stream has a callback set, the caller might need to manage extra locking.
-    ///
-    /// ## Version
-    /// This function is available since SDL 3.2.0.
-    pub fn getData(
-        self: Stream,
-        data: []u8,
-    ) ![]u8 {
-        const ret = try errors.wrapCall(c_int, c.SDL_GetAudioStreamData(self.value, data.ptr, @intCast(data.len)), -1);
-        return data.ptr[0..@intCast(ret)];
     }
 
     /// Calculate the size of each audio frame (in bytes) from an audio spec.
