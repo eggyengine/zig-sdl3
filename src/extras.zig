@@ -40,7 +40,7 @@ pub fn FramerateCapper(
             /// You may want to use this in case you have VSync in order to get dt.
             unlimited: void,
             /// Run at the given FPS.
-            limited: usize,
+            limited: Accuracy,
         };
 
         /// Delay to achieve the target FPS.
@@ -67,7 +67,7 @@ pub fn FramerateCapper(
                 .limited => |fps| {
                     if (fps != 0) {
                         // Nanoseconds per frame. 1 / (Frames / Seconds) = Seconds / Frame -> Nanoseconds / Frame.
-                        const expected_ns = @as(u64, @intFromFloat(timer.nanoseconds_per_second / @as(Accuracy, @floatFromInt(fps))));
+                        const expected_ns = @as(u64, @intFromFloat(timer.nanoseconds_per_second / fps));
                         const ns_diff = curr_ns -% self.elapsed_ns;
                         if (ns_diff < expected_ns) {
                             timer.delayNanoseconds(expected_ns -% ns_diff);
