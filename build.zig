@@ -1,5 +1,6 @@
 const std = @import("std");
 const zig = @import("builtin");
+const zig_new_io = zig.zig_version.order(.{ .major = 0, .minor = 15, .patch = std.math.maxInt(usize) }) == .gt;
 
 const image = @import("build/image.zig");
 const net = @import("build/net.zig");
@@ -257,12 +258,16 @@ pub fn runExample(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: 
 
 pub fn setupExamples(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: ExampleOptions) !*std.Build.Step {
     const exp = b.step("examples", "Build all examples");
-    const examples_dir = b.path("examples");
-    var dir = (try std.fs.openDirAbsolute(examples_dir.getPath(b), .{ .iterate = true }));
-    defer dir.close();
+    var dir = if (zig_new_io)
+        (try b.build_root.handle.openDir(b.graph.io, "examples", .{ .iterate = true }))
+    else blk: {
+        const examples_dir = b.path("examples");
+        break :blk (try std.fs.openDirAbsolute(examples_dir.getPath(b), .{ .iterate = true }));
+    };
+    defer if (zig_new_io) dir.close(b.graph.io) else dir.close();
     var dir_iterator = try dir.walk(b.allocator);
     defer dir_iterator.deinit();
-    while (try dir_iterator.next()) |file| {
+    while (try if (zig_new_io) dir_iterator.next(b.graph.io) else dir_iterator.next()) |file| {
         if (file.kind == .file and std.mem.endsWith(u8, file.basename, ".zig")) {
             const name = file.basename[0 .. file.basename.len - 4];
             var build_example = true;
