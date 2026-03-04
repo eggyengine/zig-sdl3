@@ -170,7 +170,7 @@ pub const Group = packed struct {
                 callback(@ptrCast(@alignCast(user_data_c)), Group{ .value = props }, std.mem.span(name));
             }
         };
-        const ret = c.SDL_EnumerateProperties(self.value, Cb.run, user_data);
+        const ret = c.SDL_EnumerateProperties(self.value, Cb.run, @ptrCast(user_data));
         return errors.wrapCallBool(ret);
     }
 
@@ -406,7 +406,7 @@ pub const Group = packed struct {
             name.ptr,
             value,
             if (cleanup != null) Cb.run else null,
-            user_data,
+            @ptrCast(user_data),
         );
         return errors.wrapCallBool(ret);
     }

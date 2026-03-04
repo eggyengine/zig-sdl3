@@ -507,7 +507,7 @@ pub const Stream = struct {
         return .{
             .value = try errors.wrapCallNull(*c.SDL_IOStream, c.SDL_OpenIO(
                 &interface_sdl,
-                user_data,
+                @ptrCast(user_data),
             )),
         };
     }

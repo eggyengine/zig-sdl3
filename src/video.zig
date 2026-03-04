@@ -756,7 +756,7 @@ pub const egl = struct {
             if (platform_attrib_callback != null) Cb.platform_attrib else null,
             if (surface_attrib_callback != null) Cb.surface_attrib else null,
             if (context_attrib_callback != null) Cb.context_attrib else null,
-            user_data,
+            @ptrCast(user_data),
         );
     }
 };
@@ -3057,7 +3057,7 @@ pub const Window = packed struct {
                 return @intFromEnum(callback.?(.{ .value = win_c.? }, rect.IPoint.fromSdl(area_c.*), @ptrCast(@alignCast(user_data_c))));
             }
         };
-        return errors.wrapCallBool(c.SDL_SetWindowHitTest(self.value, if (callback != null) Cb.run else null, user_data));
+        return errors.wrapCallBool(c.SDL_SetWindowHitTest(self.value, if (callback != null) Cb.run else null, @ptrCast(user_data)));
     }
 
     /// Set the icon for a window.

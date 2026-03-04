@@ -221,10 +221,10 @@ pub fn setX11EventHook(
 ) void {
     const Cb = struct {
         pub fn run(user_data_c: ?*anyopaque, xevent_c: ?*c.XEvent) callconv(.c) bool {
-            return callback(@alignCast(@ptrCast(user_data_c)), xevent_c);
+            return callback(@ptrCast(@alignCast(user_data_c)), xevent_c);
         }
     };
-    c.SDL_SetX11EventHook(Cb.run, user_data);
+    c.SDL_SetX11EventHook(Cb.run, @ptrCast(user_data));
 }
 
 // showAndroidToast

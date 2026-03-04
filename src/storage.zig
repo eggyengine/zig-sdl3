@@ -261,11 +261,11 @@ pub const Storage = packed struct {
     ) !Storage {
         const Cb = struct {
             fn deinit(user_data_c: ?*anyopaque) callconv(.c) bool {
-                interface.deinit(@alignCast(@ptrCast(user_data_c))) catch return false;
+                interface.deinit(@ptrCast(@alignCast(user_data_c))) catch return false;
                 return true;
             }
             fn ready(user_data_c: ?*anyopaque) callconv(.c) bool {
-                return interface.ready.?(@alignCast(@ptrCast(user_data_c)));
+                return interface.ready.?(@ptrCast(@alignCast(user_data_c)));
             }
             fn enumerate(
                 user_data_c: ?*anyopaque,
@@ -277,40 +277,40 @@ pub const Storage = packed struct {
                 ) callconv(.c) c.SDL_EnumerationResult,
                 callback_user_data: ?*anyopaque,
             ) callconv(.c) bool {
-                interface.enumerate.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path), callback, callback_user_data) catch return false;
+                interface.enumerate.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path), callback, callback_user_data) catch return false;
                 return true;
             }
             fn info(user_data_c: ?*anyopaque, path: [*c]const u8, path_info: [*c]c.SDL_PathInfo) callconv(.c) bool {
-                const ret = interface.info.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path)) catch return false;
+                const ret = interface.info.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path)) catch return false;
                 path_info.* = ret.toSdl();
                 return true;
             }
             fn read_file(user_data_c: ?*anyopaque, path: [*c]const u8, destination: ?*anyopaque, length: u64) callconv(.c) bool {
-                interface.read_file.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path), @as([*]u8, @ptrCast(destination))[0..@intCast(length)]) catch return false;
+                interface.read_file.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path), @as([*]u8, @ptrCast(destination))[0..@intCast(length)]) catch return false;
                 return true;
             }
             fn write_file(user_data_c: ?*anyopaque, path: [*c]const u8, source: ?*const anyopaque, length: u64) callconv(.c) bool {
-                interface.write_file.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path), @as([*]const u8, @ptrCast(source))[0..@intCast(length)]) catch return false;
+                interface.write_file.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path), @as([*]const u8, @ptrCast(source))[0..@intCast(length)]) catch return false;
                 return true;
             }
             fn mkdir(user_data_c: ?*anyopaque, path: [*c]const u8) callconv(.c) bool {
-                interface.mkdir.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path)) catch return false;
+                interface.mkdir.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path)) catch return false;
                 return true;
             }
             fn remove(user_data_c: ?*anyopaque, path: [*c]const u8) callconv(.c) bool {
-                interface.remove.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(path)) catch return false;
+                interface.remove.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(path)) catch return false;
                 return true;
             }
             fn rename(user_data_c: ?*anyopaque, old_path: [*c]const u8, new_path: [*c]const u8) callconv(.c) bool {
-                interface.rename.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(old_path), std.mem.span(new_path)) catch return false;
+                interface.rename.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(old_path), std.mem.span(new_path)) catch return false;
                 return true;
             }
             fn copy(user_data_c: ?*anyopaque, old_path: [*c]const u8, new_path: [*c]const u8) callconv(.c) bool {
-                interface.copy.?(@alignCast(@ptrCast(user_data_c)), std.mem.span(old_path), std.mem.span(new_path)) catch return false;
+                interface.copy.?(@ptrCast(@alignCast(user_data_c)), std.mem.span(old_path), std.mem.span(new_path)) catch return false;
                 return true;
             }
             fn space_remaining(user_data_c: ?*anyopaque) callconv(.c) u64 {
-                return interface.space_remaining.?(@alignCast(@ptrCast(user_data_c)));
+                return interface.space_remaining.?(@ptrCast(@alignCast(user_data_c)));
             }
         };
         const iface = c.SDL_StorageInterface{
@@ -327,7 +327,7 @@ pub const Storage = packed struct {
             .space_remaining = if (interface.space_remaining != null) Cb.space_remaining else null,
         };
         return .{
-            .value = try errors.wrapCallNull(*c.SDL_Storage, c.SDL_OpenStorage(&iface, user_data)),
+            .value = try errors.wrapCallNull(*c.SDL_Storage, c.SDL_OpenStorage(&iface, @ptrCast(user_data))),
         };
     }
 
@@ -436,7 +436,7 @@ pub const Storage = packed struct {
                 return @intFromEnum(callback(@ptrCast(@alignCast(user_data_c)), std.mem.span(dir_name_c), std.mem.span(name_c)));
             }
         };
-        return errors.wrapCallBool(c.SDL_EnumerateStorageDirectory(storage.value, if (path) |val| val.ptr else null, Cb.run, user_data));
+        return errors.wrapCallBool(c.SDL_EnumerateStorageDirectory(storage.value, if (path) |val| val.ptr else null, Cb.run, @ptrCast(user_data)));
     }
 
     /// Data for getting all properties.

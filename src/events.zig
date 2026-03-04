@@ -2940,7 +2940,7 @@ pub fn addWatch(
             return ret;
         }
     };
-    try errors.wrapCallBool(c.SDL_AddEventWatch(Cb.run, user_data));
+    try errors.wrapCallBool(c.SDL_AddEventWatch(Cb.run, @ptrCast(user_data)));
     return Cb.run;
 }
 
@@ -3009,7 +3009,7 @@ pub fn filter(
             return ret;
         }
     };
-    c.SDL_FilterEvents(Cb.run, user_data);
+    c.SDL_FilterEvents(Cb.run, @ptrCast(user_data));
 }
 
 /// Clear events of a specific type from the event queue.
@@ -3318,7 +3318,7 @@ pub fn removeWatch(
     event_filter: FilterC,
     user_data: ?*anyopaque,
 ) void {
-    c.SDL_RemoveEventWatch(event_filter, user_data);
+    c.SDL_RemoveEventWatch(event_filter, @ptrCast(user_data));
 }
 
 /// Set the state of processing events by type.
@@ -3385,7 +3385,7 @@ pub fn setFilter(
             return ret;
         }
     };
-    c.SDL_SetEventFilter(Cb.run, user_data);
+    c.SDL_SetEventFilter(Cb.run, @ptrCast(user_data));
     return Cb.run;
 }
 

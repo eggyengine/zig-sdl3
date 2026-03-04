@@ -92,7 +92,7 @@ pub const Thread = packed struct {
 
             // Callback.
             fn run(user_data_c: ?*anyopaque) callconv(.c) c_int {
-                return entry_function(@alignCast(@ptrCast(user_data_c)));
+                return entry_function(@ptrCast(@alignCast(user_data_c)));
             }
 
             // Get properties, must free after.
@@ -177,7 +177,7 @@ pub const Thread = packed struct {
     ) !Thread {
         const Cb = struct {
             fn run(user_data_c: ?*anyopaque) callconv(.c) c_int {
-                return func(@alignCast(@ptrCast(user_data_c)));
+                return func(@ptrCast(@alignCast(user_data_c)));
             }
         };
         return .{ .value = try errors.wrapCallNull(*c.SDL_Thread, c.SDL_CreateThread(Cb.run, if (name) |val| val.ptr else null, data)) };
@@ -430,7 +430,7 @@ pub const TlsId = struct {
     ) !void {
         const Cb = struct {
             pub fn run(value_c: ?*anyopaque) callconv(.c) void {
-                destructor.?(@alignCast(@ptrCast(value_c)));
+                destructor.?(@ptrCast(@alignCast(value_c)));
             }
         };
         return errors.wrapCallBool(c.SDL_SetTLS(&self.value, value, if (destructor != null) Cb.run else null));

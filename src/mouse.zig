@@ -775,7 +775,7 @@ pub fn setRelativeTransform(
             callback.?(@ptrCast(@alignCast(c_user_data)), c_time_stamp, if (c_window) |val| .{ .value = val } else null, .{ .value = c_mouse_id }, c_x, c_y);
         }
     };
-    return errors.wrapCallBool(c.SDL_SetRelativeMouseTransform(if (callback != null) Cb.run else null, user_data));
+    return errors.wrapCallBool(c.SDL_SetRelativeMouseTransform(if (callback != null) Cb.run else null, @ptrCast(user_data)));
 }
 
 /// Set a window's mouse grab mode.

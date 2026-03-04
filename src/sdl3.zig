@@ -1180,7 +1180,7 @@ pub fn runOnMainThread(
             callback(@ptrCast(@alignCast(user_data_c)));
         }
     };
-    const ret = c.SDL_RunOnMainThread(Cb.run, user_data, wait_complete);
+    const ret = c.SDL_RunOnMainThread(Cb.run, @ptrCast(user_data), wait_complete);
     return errors.wrapCallBool(ret);
 }
 
