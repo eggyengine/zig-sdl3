@@ -27,7 +27,7 @@ The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
 ```sh
-zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.1.8
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.1.9
 ```
 * For in progress updates (nightly):
 ```sh
@@ -42,7 +42,6 @@ const sdl3 = b.dependency("sdl3", .{
     .optimize = optimize,
 
     // Lib options.
-    /// .callbacks = false,
     /// .ext_image = false,
     /// .ext_net = false,
     /// .ext_ttf = false,

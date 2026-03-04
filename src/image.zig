@@ -6,6 +6,11 @@ const version = @import("version.zig");
 const surface = @import("surface.zig");
 const std = @import("std");
 
+comptime {
+    if (!@hasDecl(c, "IMG_Animation"))
+        @compileError("The ext_image feature is either not enabled or not working!");
+}
+
 /// Animated image support.
 ///
 /// ## Remarks

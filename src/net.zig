@@ -2,6 +2,11 @@ const c = @import("c");
 const errors = @import("errors.zig");
 const std = @import("std");
 
+comptime {
+    if (!@hasDecl(c, "NET_Quit"))
+        @compileError("The ext_net feature is either not enabled or not working!");
+}
+
 /// The current major version of SDL_net headers.
 pub const major_version = c.SDL_NET_MAJOR_VERSION;
 

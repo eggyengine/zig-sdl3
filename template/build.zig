@@ -15,7 +15,6 @@ fn buildBin(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     const sdl3 = b.dependency("sdl3", .{
         .target = target,
         .optimize = optimize,
-        .callbacks = true,
         .ext_image = true,
     });
     exe.root_module.addImport("sdl3", sdl3.module("sdl3"));
