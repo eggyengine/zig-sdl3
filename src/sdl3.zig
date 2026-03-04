@@ -395,7 +395,8 @@ pub const hints = @import("hints.zig");
 /// This is a simple library to load images of various formats as SDL surfaces.
 /// It can load BMP, GIF, JPEG, LBM, PCX, PNG, PNM (PPM/PGM/PBM), QOI, TGA, XCF, XPM, and simple SVG format images.
 /// It can also load AVIF, JPEG-XL, TIFF, and WebP images, depending on build options.
-pub const image = if (extension_options.image) @import("image.zig") else void;
+/// If there are errors using this, you need to ensure `ext_net` is set to `true`.
+pub const image = @import("image.zig");
 
 /// SDL does some preprocessor gymnastics to determine if any CPU-specific compiler intrinsics are available,
 /// as this is not necessarily an easy thing to calculate, and sometimes depends on quirks of a system, versions of build tools, and other external forces.
@@ -517,7 +518,7 @@ pub const Locale = @import("locale.zig").Locale;
 pub const log = @import("log.zig");
 
 /// Main callback functions when desired.
-pub const main_callbacks = if (options.callbacks) @import("main_callbacks.zig") else void;
+pub const main_callbacks = @import("main_callbacks.zig");
 
 /// Ability to call other main functions.
 ///
@@ -583,7 +584,8 @@ pub const mouse = @import("mouse.zig");
 pub const mutex = @import("mutex.zig");
 
 /// TODO documentation.
-pub const net = if (extension_options.net) @import("net.zig") else void;
+/// If there are errors using this, you need to ensure `ext_net` is set to `true`.
+pub const net = @import("net.zig");
 
 /// SDL API functions that don't fit elsewhere.
 pub const openURL = @import("misc.zig").openURL;
@@ -763,7 +765,8 @@ pub const thread = @import("thread.zig");
 pub const time = @import("time.zig");
 
 /// TODO documentation.
-pub const ttf = if (extension_options.ttf) @import("ttf.zig") else void;
+/// If there are errors using this, you need to ensure `ext_ttf` is set to `true`.
+pub const ttf = @import("ttf.zig");
 
 /// SDL provides time management functionality.
 /// It is useful for dealing with (usually) small durations of time.
@@ -821,7 +824,6 @@ pub const video = @import("video.zig");
 pub const vulkan = @import("vulkan.zig");
 
 // Others.
-const extension_options = @import("extension_options");
 const options = @import("options");
 const std = @import("std");
 
@@ -2074,7 +2076,68 @@ fn testRunOnMainThreadCb(user_data: ?*i32) void {
 // Add all tests from subsystems.
 test {
     errors.error_callback = null;
-    std.testing.refAllDecls(@This());
+    comptime {
+        _ = @import("assert.zig");
+        _ = @import("async_io.zig");
+        _ = @import("atomic.zig");
+        _ = @import("audio.zig");
+        _ = @import("bits.zig");
+        _ = @import("blend_mode.zig");
+        _ = @import("camera.zig");
+        _ = @import("clipboard.zig");
+        _ = @import("cpu_info.zig");
+        _ = @import("dialog.zig");
+        _ = @import("endian.zig");
+        _ = @import("errors.zig");
+        _ = @import("events.zig");
+        _ = @import("extras.zig");
+        _ = @import("filesystem.zig");
+        _ = @import("gamepad.zig");
+        _ = @import("gpu.zig");
+        _ = @import("guid.zig");
+        _ = @import("haptic.zig");
+        _ = @import("hid_api.zig");
+        _ = @import("hints.zig");
+        _ = @import("image.zig");
+        _ = @import("intrin.zig");
+        _ = @import("io_stream.zig");
+        _ = @import("joystick.zig");
+        _ = @import("keyboard.zig");
+        _ = @import("keycode.zig");
+        _ = @import("loadso.zig");
+        _ = @import("locale.zig");
+        _ = @import("log.zig");
+        _ = @import("main.zig");
+        // _ = @import("main_callbacks.zig");
+        _ = @import("message_box.zig");
+        _ = @import("metal.zig");
+        _ = @import("misc.zig");
+        _ = @import("mouse.zig");
+        _ = @import("mutex.zig");
+        // _ = @import("net.zig");
+        _ = @import("pen.zig");
+        _ = @import("pixels.zig");
+        _ = @import("platform.zig");
+        _ = @import("power.zig");
+        _ = @import("process.zig");
+        _ = @import("properties.zig");
+        _ = @import("rect.zig");
+        _ = @import("render.zig");
+        _ = @import("scancode.zig");
+        _ = @import("sensor.zig");
+        _ = @import("storage.zig");
+        _ = @import("surface.zig");
+        _ = @import("system.zig");
+        _ = @import("thread.zig");
+        _ = @import("time.zig");
+        _ = @import("timer.zig");
+        _ = @import("touch.zig");
+        _ = @import("tray.zig");
+        _ = @import("ttf.zig");
+        _ = @import("version.zig");
+        _ = @import("video.zig");
+        _ = @import("vulkan.zig");
+    }
 
     defer shutdown();
     const flags = InitFlags{

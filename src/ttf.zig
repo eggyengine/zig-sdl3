@@ -24,6 +24,11 @@ const surface = @import(
     "surface.zig",
 );
 
+comptime {
+    if (!@hasDecl(c, "TTF_GetFreeTypeVersion"))
+        @compileError("The ext_ttf feature is either not enabled or not working!");
+}
+
 pub const Color = struct {
     r: u8,
     g: u8,
