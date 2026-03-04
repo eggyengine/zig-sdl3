@@ -92,8 +92,6 @@ pub fn build(b: *std.Build) !void {
 
     // SDL options.
     const options = b.addOptions();
-    const main_callbacks = b.option(bool, "callbacks", "Enable SDL callbacks rather than use a main function") orelse false;
-    options.addOption(bool, "callbacks", main_callbacks);
     const sdl3_main = b.option(bool, "main", "Enable SDL main") orelse false;
     options.addOption(bool, "main", sdl3_main);
     options.addOption(
