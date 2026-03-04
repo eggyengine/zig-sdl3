@@ -2073,6 +2073,7 @@ fn testRunOnMainThreadCb(user_data: ?*i32) void {
 
 // Add all tests from subsystems.
 test {
+    errors.error_callback = null;
     std.testing.refAllDecls(@This());
 
     defer shutdown();

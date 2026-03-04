@@ -1,4 +1,5 @@
 const c = @import("c");
+const extras = @import("extras.zig");
 const std = @import("std");
 
 /// Callback for when an SDL error occurs.
@@ -9,7 +10,7 @@ const std = @import("std");
 /// This is provided by zig-sdl3.
 pub threadlocal var error_callback: ?*const fn (
     err: ?[:0]const u8,
-) void = null;
+) void = extras.sdlErrSdlLog;
 
 /// An SDL error.
 pub const Error = error{
