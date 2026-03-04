@@ -481,13 +481,13 @@ pub const Timer = struct {
     ) !Timer {
         const Cb = struct {
             pub fn run(user_data_c: ?*anyopaque, timer_c: c.SDL_TimerID, interval_milliseconds_c: u32) callconv(.c) u32 {
-                return callback(@alignCast(@ptrCast(user_data_c)), .{ .value = timer_c }, interval_milliseconds_c);
+                return callback(@ptrCast(@alignCast(user_data_c)), .{ .value = timer_c }, interval_milliseconds_c);
             }
         };
         const ret = c.SDL_AddTimer(
             @intCast(interval_milliseconds),
             Cb.run,
-            user_data,
+            @ptrCast(user_data),
         );
         return Timer{ .value = try errors.wrapCall(c.SDL_TimerID, ret, 0) };
     }
@@ -529,13 +529,13 @@ pub const Timer = struct {
     ) !Timer {
         const Cb = struct {
             pub fn run(user_data_c: ?*anyopaque, timer_c: c.SDL_TimerID, interval_nanoseconds_c: u64) callconv(.c) u64 {
-                return callback(@alignCast(@ptrCast(user_data_c)), .{ .value = timer_c }, interval_nanoseconds_c);
+                return callback(@ptrCast(@alignCast(user_data_c)), .{ .value = timer_c }, interval_nanoseconds_c);
             }
         };
         const ret = c.SDL_AddTimerNS(
             @intCast(interval_nanoseconds),
             Cb.run,
-            user_data,
+            @ptrCast(user_data),
         );
         return Timer{ .value = try errors.wrapCall(c.SDL_TimerID, ret, 0) };
     }

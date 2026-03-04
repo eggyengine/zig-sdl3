@@ -516,7 +516,7 @@ pub fn setLogOutputFunction(
     };
     c.SDL_SetLogOutputFunction(
         if (callback) |_| Cb.run else getDefaultLogOutputFunction(),
-        user_data,
+        @ptrCast(user_data),
     );
 }
 

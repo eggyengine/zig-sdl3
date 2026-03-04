@@ -419,7 +419,7 @@ pub fn enumerateDirectory(
             return @intFromEnum(callback(@ptrCast(@alignCast(user_data_c)), std.mem.span(dir_name_c), std.mem.span(name_c)));
         }
     };
-    return errors.wrapCallBool(c.SDL_EnumerateDirectory(path.ptr, Cb.run, user_data));
+    return errors.wrapCallBool(c.SDL_EnumerateDirectory(path.ptr, Cb.run, @ptrCast(user_data)));
 }
 
 /// Data for getting all properties.

@@ -233,7 +233,7 @@ pub const Entry = struct {
                 callback(@ptrCast(@alignCast(user_data_c)), .{ .value = entry_c.? });
             }
         };
-        c.SDL_SetTrayEntryCallback(self.value, Cb.run, user_data);
+        c.SDL_SetTrayEntryCallback(self.value, Cb.run, @ptrCast(user_data));
     }
 
     /// Sets whether or not an entry is checked.

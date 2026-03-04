@@ -1015,7 +1015,7 @@ pub const Device = packed struct {
                 callback.?(@ptrCast(@alignCast(user_data_c)), Spec.fromSdl(spec_c.*), buffer_c[0..@intCast(buffer_len_c)]);
             }
         };
-        return errors.wrapCallBool(c.SDL_SetAudioPostmixCallback(self.value, Cb.run orelse null, user_data));
+        return errors.wrapCallBool(c.SDL_SetAudioPostmixCallback(self.value, Cb.run orelse null, @ptrCast(user_data)));
     }
 };
 
@@ -1568,7 +1568,7 @@ pub const Stream = packed struct {
             data.ptr,
             @intCast(data.len),
             if (callback != null) Cb.run else null,
-            user_data,
+            @ptrCast(user_data),
         ));
     }
 
@@ -1775,7 +1775,7 @@ pub const Stream = packed struct {
         _ = c.SDL_SetAudioStreamGetCallback(
             self.value,
             if (callback != null) Cb.run else null,
-            user_data,
+            @ptrCast(user_data),
         );
     }
 
@@ -1941,7 +1941,7 @@ pub const Stream = packed struct {
         _ = c.SDL_SetAudioStreamPutCallback(
             self.value,
             if (callback != null) Cb.run else null,
-            user_data,
+            @ptrCast(user_data),
         );
     }
 

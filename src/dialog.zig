@@ -185,7 +185,7 @@ fn sanatizeFileCallback(
         _ = errors.wrapCallNull(FileCallbackData(UserData), null) catch {};
     }
     return .{
-        .user_data = @alignCast(@ptrCast(user_data)),
+        .user_data = @ptrCast(@alignCast(user_data)),
         .file_list = list,
         .filter = if (filter < 0) null else @intCast(filter),
         .err = err,
@@ -238,7 +238,7 @@ pub fn showOpenFile(
     };
     c.SDL_ShowOpenFileDialog(
         Cb.run,
-        user_data,
+        @ptrCast(user_data),
         if (window) |val| val.value else null,
         if (filters) |val| @ptrCast(val.ptr) else null,
         if (filters) |val| @intCast(val.len) else 0,
@@ -292,7 +292,7 @@ pub fn showOpenFolder(
     };
     c.SDL_ShowOpenFolderDialog(
         Cb.run,
-        user_data,
+        @ptrCast(user_data),
         if (window) |val| val.value else null,
         if (default_location) |val| val.ptr else null,
         allow_many,
@@ -344,7 +344,7 @@ pub fn showSaveFile(
     };
     c.SDL_ShowSaveFileDialog(
         Cb.run,
-        user_data,
+        @ptrCast(user_data),
         if (window) |val| val.value else null,
         if (filters) |val| @ptrCast(val.ptr) else null,
         if (filters) |val| @intCast(val.len) else 0,
@@ -387,7 +387,7 @@ pub fn showWithProperties(
     c.SDL_ShowFileDialogWithProperties(
         @intFromEnum(dialog_type),
         Cb.run,
-        user_data,
+        @ptrCast(user_data),
         ret.value,
     );
     return ret;

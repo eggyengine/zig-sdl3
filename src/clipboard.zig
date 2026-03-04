@@ -229,7 +229,7 @@ pub fn setData(
 ) !void {
     const Cb = struct {
         pub fn runCallback(user_data_c: ?*anyopaque, mime_type_c: [*c]const u8, size_c: [*c]usize) callconv(.c) ?*anyopaque {
-            const data = callback(@alignCast(@ptrCast(user_data_c)), if (mime_type_c) |val| std.mem.span(val) else null);
+            const data = callback(@ptrCast(@alignCast(user_data_c)), if (mime_type_c) |val| std.mem.span(val) else null);
             if (data) |val| {
                 size_c.* = val.len;
                 return val.ptr;
@@ -238,13 +238,13 @@ pub fn setData(
         }
 
         pub fn runCleanup(user_data_c: ?*anyopaque) callconv(.c) void {
-            cleanup(@alignCast(@ptrCast(user_data_c)));
+            cleanup(@ptrCast(@alignCast(user_data_c)));
         }
     };
     const ret = c.SDL_SetClipboardData(
         Cb.runCallback,
         Cb.runCleanup,
-        user_data,
+        @ptrCast(user_data),
         @ptrCast(mime_types.ptr),
         @intCast(mime_types.len),
     );

@@ -244,7 +244,7 @@ pub fn setHandler(
             return @intFromEnum(handler.?(@bitCast(assert_data_c.*), @ptrCast(@alignCast(user_data_c))));
         }
     };
-    c.SDL_SetAssertionHandler(if (handler != null) Cb.run else null, user_data);
+    c.SDL_SetAssertionHandler(if (handler != null) Cb.run else null, @ptrCast(user_data));
 }
 
 const TestHandlerCallbackData = struct {

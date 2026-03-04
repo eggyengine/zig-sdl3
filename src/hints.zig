@@ -626,7 +626,7 @@ pub fn addCallback(
     const ret = c.SDL_AddHintCallback(
         hint.toSdl(),
         Cb.run,
-        user_data,
+        @ptrCast(user_data),
     );
     try errors.wrapCallBool(ret);
     return Cb.run;
