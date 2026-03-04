@@ -42,7 +42,6 @@ const sdl3 = b.dependency("sdl3", .{
     .optimize = optimize,
 
     // Lib options.
-    /// .callbacks = false,
     /// .ext_image = false,
     /// .ext_net = false,
     /// .ext_ttf = false,
