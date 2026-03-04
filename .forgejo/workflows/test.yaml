@@ -58,5 +58,7 @@ jobs:
       - uses: https://codeberg.org/mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
-      - name: Testing
+      - name: Testing Linux
         run: zig build test -Dtarget=x86_64-linux-gnu
+      - name: Testing Windows
+        run: zig build test -Dtarget=x86_64-linux-gnu -fwine
