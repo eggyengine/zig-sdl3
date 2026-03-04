@@ -6,6 +6,14 @@ const allocator = std.heap.smp_allocator;
 const fps = 60;
 const screen_width = 640;
 const screen_height = 480;
+const init_flags = sdl3.InitFlags{ .video = true };
+
+// Disable main and use SDL3's main callbacks.
+comptime {
+    _ = sdl3.main_callbacks;
+}
+pub const _start = void;
+pub const WinMainCRTStartup = void;
 
 /// Application state to keep track of.
 const AppState = struct {
@@ -14,13 +22,17 @@ const AppState = struct {
 };
 
 /// Runs once on application startup.
-fn init(
+pub fn init(
     app_state: *?*AppState,
     args: [][*:0]u8,
 ) !sdl3.AppResult {
+    _ = args;
+    try sdl3.init(init_flags);
+    errdefer sdl3.quit(init_flags);
+
     // Create window.
     // We use `errdefer` as we will only free items from the app with a created app state.
-    const window = try sdl3.video.Window.init(std.mem.span(args[0]), screen_width, screen_height, .{});
+    const window = try sdl3.video.Window.init("Hello SDL3", screen_width, screen_height, .{});
     errdefer window.deinit();
 
     // Finally create the application state.
@@ -34,7 +46,7 @@ fn init(
 }
 
 /// Iterate function that is called once every frame.
-fn iterate(
+pub fn iterate(
     app_state: *AppState,
 ) !sdl3.AppResult {
 
@@ -51,7 +63,7 @@ fn iterate(
 }
 
 /// Event loop function for when an event is recieved.
-fn event(
+pub fn event(
     app_state: *AppState,
     curr_event: sdl3.events.Event,
 ) !sdl3.AppResult {
@@ -65,7 +77,7 @@ fn event(
 }
 
 /// Called when quitting.
-fn quit(
+pub fn quit(
     app_state: ?*AppState,
     result: sdl3.AppResult,
 ) void {
@@ -76,15 +88,6 @@ fn quit(
         state.window.deinit();
         allocator.destroy(state);
     }
-}
-
-pub fn main() u8 {
-
-    // Example on how to use callbacks for a project that does not use them as a build option.
-    // For an example on how to create a project using the callbacks without this, see the template.
-    sdl3.main_funcs.setMainReady();
-    var args = [_:null]?[*:0]u8{
-        @constCast("Hello SDL3"),
-    };
-    return sdl3.main_funcs.enterAppMainCallbacks(&args, AppState, init, iterate, event, quit);
+    sdl3.quit(init_flags);
+    sdl3.shutdown();
 }
