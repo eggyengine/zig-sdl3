@@ -21,7 +21,7 @@ const std = @import("std");
 pub fn LogOutputFunction(comptime UserData: type) type {
     return *const fn (
         user_data: ?*UserData,
-        category: ?Category,
+        category: Category,
         priority: ?Priority,
         message: [:0]const u8,
     ) void;
@@ -122,9 +122,7 @@ pub const Category = enum(c_int) {
     _,
 
     /// Get zig representation of a category.
-    pub fn fromSdl(val: c_int) ?Category {
-        if (val == c.SDL_LOG_CATEGORY_ERROR)
-            return null;
+    pub fn fromSdl(val: c_int) Category {
         return @enumFromInt(val);
     }
 
@@ -550,10 +548,10 @@ const TestLogCallbackData = struct {
     last_priority: ?Priority = null,
 };
 
-fn testLogCallback(user_data: ?*TestLogCallbackData, category: ?Category, priority: ?Priority, message: [:0]const u8) void {
+fn testLogCallback(user_data: ?*TestLogCallbackData, category: Category, priority: ?Priority, message: [:0]const u8) void {
     const data = user_data.?;
     data.last_str = data.buf.items.len;
-    data.last_category = category.?;
+    data.last_category = category;
     data.last_priority = priority.?;
     data.buf.appendSlice(message) catch {};
 }

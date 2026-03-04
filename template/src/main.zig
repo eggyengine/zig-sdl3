@@ -53,7 +53,6 @@ pub fn init(
     _ = args;
 
     // Setup logging.
-    sdl3.errors.error_callback = &sdl3.extras.sdlErrZigLog;
     sdl3.log.setAllPriorities(.info);
     sdl3.log.setLogOutputFunction(void, &sdl3.extras.sdlLogZigLog, null);
 
