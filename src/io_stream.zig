@@ -649,7 +649,7 @@ pub const Stream = struct {
                 switch (whence) {
                     .set => try user_data.?.seekTo(@intCast(offset)),
                     .cur => try user_data.?.seekBy(@intCast(offset)),
-                    .end => try user_data.?.seekFromEnd(@intCast(offset)),
+                    .end => try user_data.?.seekTo((try user_data.?.getEndPos()) - @as(u64, @intCast(offset))),
                 }
                 return @intCast(try user_data.?.getPos());
             }
@@ -2262,5 +2262,23 @@ test "Stream" {
     try stream2.deinit();
     try std.testing.expectEqual(false, test_global);
 
-    // TODO: FILE INTERFACE TESTS!
+    // Test file interface.
+    if (@import("builtin").os.tag == .linux) {
+        var tmp_dir = try std.fs.openDirAbsolute("/tmp", .{});
+        defer tmp_dir.close();
+
+        var tmp_file = try tmp_dir.createFile("iostream_test", .{ .read = true });
+        const sdl_stream = try Stream.initFromFsFile(&tmp_file);
+        try sdl_stream.writeU8(7);
+        try sdl_stream.writeU8(3);
+        try std.testing.expectEqual(0, sdl_stream.seek(0, .set));
+        try std.testing.expectEqual(7, try sdl_stream.readU8());
+        try std.testing.expectEqual(3, try sdl_stream.readU8());
+        try std.testing.expectEqual(62, try sdl_stream.write(&([_]u8{0} ** 62)));
+        try std.testing.expectEqual(64, try sdl_stream.getSize());
+        try std.testing.expectEqual(50, sdl_stream.seek(50, .set));
+        try std.testing.expectEqual(41, sdl_stream.seek(23, .end));
+        try std.testing.expectEqual(43, sdl_stream.seek(2, .cur));
+        try sdl_stream.deinit();
+    }
 }
