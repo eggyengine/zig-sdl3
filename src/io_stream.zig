@@ -86,7 +86,7 @@ pub fn Interface(comptime UserData: type) type {
         ///
         /// ## Return Value
         /// The total size of the data stream.
-        size: *const fn (user_data: ?*UserData) anyerror!usize,
+        size: ?*const fn (user_data: ?*UserData) anyerror!usize = null,
 
         /// Seek to `offset` relative to `whence`.
         ///
@@ -97,7 +97,7 @@ pub fn Interface(comptime UserData: type) type {
         ///
         /// ## Return Value
         /// The final offset in the data stream.
-        seek: *const fn (user_data: ?*UserData, offset: isize, whence: Whence) anyerror!usize,
+        seek: ?*const fn (user_data: ?*UserData, offset: isize, whence: Whence) anyerror!usize = null,
 
         /// Read up to `size` bytes from the data stream to the area pointed at by `ptr`.
         ///
@@ -108,7 +108,7 @@ pub fn Interface(comptime UserData: type) type {
         ///
         /// ## Return Value
         /// The actual read buffer data.
-        read: *const fn (user_data: ?*UserData, buf: []u8) Error!?[]u8,
+        read: ?*const fn (user_data: ?*UserData, buf: []u8) Error!?[]u8 = null,
 
         /// Write up to `size` bytes to the data stream from the area pointed at by `ptr`.
         ///
@@ -118,13 +118,13 @@ pub fn Interface(comptime UserData: type) type {
         ///
         /// ## Return Value
         /// The number of bytes written.
-        write: *const fn (user_data: ?*UserData, data: []const u8) Error!usize,
+        write: ?*const fn (user_data: ?*UserData, data: []const u8) Error!usize = null,
 
         /// If the stream is buffering, make sure the data is written out.
         ///
         /// ## Function Parameters
         /// * `user_data`: User context.
-        flush: *const fn (user_data: ?*UserData) Error!void,
+        flush: ?*const fn (user_data: ?*UserData) Error!void = null,
 
         /// Close and free any allocated resources.
         ///
@@ -134,10 +134,10 @@ pub fn Interface(comptime UserData: type) type {
         /// ## Remarks
         /// This does not guarantee file writes will sync to physical media; they can be in the system's file cache, waiting to go to disk.
         /// The stream is still destroyed even if this fails, so clean up anything even if flushing buffers, etc, returns an error.
-        close: *const fn (user_data: ?*UserData) anyerror!void,
+        close: ?*const fn (user_data: ?*UserData) anyerror!void = null,
 
         /// Convert to an SDL value.
-        pub fn toSdl(self: Interface(UserData)) c.SDL_IOStreamInterface {
+        pub fn toSdl(comptime self: Interface(UserData)) c.SDL_IOStreamInterface {
             const Cb = struct {
                 /// Returns the number of bytes in the stream.
                 ///
@@ -147,7 +147,7 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// The total size of the data stream, or `-1` on error.
                 pub fn size_c(user_data_c: ?*anyopaque) callconv(.c) i64 {
-                    const ret = self.size(@ptrCast(@alignCast(user_data_c))) catch return -1;
+                    const ret = self.size.?(@ptrCast(@alignCast(user_data_c))) catch return -1;
                     return @intCast(ret);
                 }
 
@@ -161,7 +161,7 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// The final offset in the data stream, or `-1` on error.
                 pub fn seek_c(user_data_c: ?*anyopaque, offset_c: i64, whence_c: c.SDL_IOWhence) callconv(.c) i64 {
-                    const ret = self.seek(@ptrCast(@alignCast(user_data_c)), @intCast(offset_c), @enumFromInt(whence_c)) catch return -1;
+                    const ret = self.seek.?(@ptrCast(@alignCast(user_data_c)), @intCast(offset_c), @enumFromInt(whence_c)) catch return -1;
                     return @intCast(ret);
                 }
 
@@ -179,12 +179,12 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// The number of bytes read.
                 pub fn read_c(user_data_c: ?*anyopaque, ptr_c: ?*anyopaque, size_c_val: usize, status_c: [*c]c.SDL_IOStatus) callconv(.c) usize {
-                    const ret = self.read(@ptrCast(@alignCast(user_data_c)), @as([*]u8, @ptrCast(@alignCast(ptr_c)))[0..@intCast(size_c_val)]) catch |err| {
+                    const ret = self.read.?(@ptrCast(@alignCast(user_data_c)), @as([*]u8, @ptrCast(@alignCast(ptr_c)))[0..@intCast(size_c_val)]) catch |err| {
                         status_c.* = switch (err) {
-                            .Err => c.SDL_IO_STATUS_ERROR,
-                            .NotReady => c.SDL_IO_STATUS_NOT_READY,
-                            .ReadOnly => c.SDL_IO_STATUS_READONLY,
-                            .WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
+                            error.Err => c.SDL_IO_STATUS_ERROR,
+                            error.NotReady => c.SDL_IO_STATUS_NOT_READY,
+                            error.ReadOnly => c.SDL_IO_STATUS_READONLY,
+                            error.WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
                         };
                         return 0;
                     };
@@ -206,12 +206,12 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// The number of bytes written.
                 pub fn write_c(user_data_c: ?*anyopaque, ptr_c: ?*const anyopaque, size_c_val: usize, status_c: [*c]c.SDL_IOStatus) callconv(.c) usize {
-                    const ret = self.write(@ptrCast(@alignCast(user_data_c)), @as([*]const u8, @ptrCast(@alignCast(ptr_c)))[0..@intCast(size_c_val)]) catch |err| {
+                    const ret = self.write.?(@ptrCast(@alignCast(user_data_c)), @as([*]const u8, @ptrCast(@alignCast(ptr_c)))[0..@intCast(size_c_val)]) catch |err| {
                         status_c.* = switch (err) {
-                            .Err => c.SDL_IO_STATUS_ERROR,
-                            .NotReady => c.SDL_IO_STATUS_NOT_READY,
-                            .ReadOnly => c.SDL_IO_STATUS_READONLY,
-                            .WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
+                            error.Err => c.SDL_IO_STATUS_ERROR,
+                            error.NotReady => c.SDL_IO_STATUS_NOT_READY,
+                            error.ReadOnly => c.SDL_IO_STATUS_READONLY,
+                            error.WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
                         };
                         return 0;
                     };
@@ -230,12 +230,12 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// True if successful.
                 pub fn flush_c(user_data_c: ?*anyopaque, status: [*c]c.SDL_IOStatus) callconv(.c) bool {
-                    self.flush(@ptrCast(@alignCast(user_data_c))) catch |err| {
+                    self.flush.?(@ptrCast(@alignCast(user_data_c))) catch |err| {
                         status.* = switch (err) {
-                            .Err => c.SDL_IO_STATUS_ERROR,
-                            .NotReady => c.SDL_IO_STATUS_NOT_READY,
-                            .ReadOnly => c.SDL_IO_STATUS_READONLY,
-                            .WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
+                            error.Err => c.SDL_IO_STATUS_ERROR,
+                            error.NotReady => c.SDL_IO_STATUS_NOT_READY,
+                            error.ReadOnly => c.SDL_IO_STATUS_READONLY,
+                            error.WriteOnly => c.SDL_IO_STATUS_WRITEONLY,
                         };
                         return false;
                     };
@@ -255,7 +255,7 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// True if successful.
                 pub fn close_c(user_data_c: ?*anyopaque) callconv(.c) bool {
-                    self.close(@ptrCast(@alignCast(user_data_c))) catch return false;
+                    self.close.?(@ptrCast(@alignCast(user_data_c))) catch return false;
                     return true;
                 }
             };
@@ -610,6 +610,78 @@ pub const Stream = struct {
         };
     }
 
+    /// Initialize an SDL IO stream from a zig filesystem file.
+    ///
+    /// ## Function
+    /// * `file`: The file to initialize an SDL stream interface for.
+    ///
+    /// ## Return Value
+    /// Returns the stream.
+    ///
+    /// ## Version
+    /// This function is provided by zig-sdl3.
+    pub fn initFromFsFile(
+        file: *std.fs.File,
+    ) !Stream {
+        const FsFileInterface = struct {
+            const UserData = std.fs.File;
+
+            fn interface_close(user_data: ?*UserData) anyerror!void {
+                user_data.?.close();
+            }
+
+            fn interface_flush(user_data: ?*UserData) Error!void {
+                _ = user_data; // File does not need to flush?
+            }
+
+            fn interface_read(user_data: ?*UserData, buf: []u8) Error!?[]u8 {
+                const ret = user_data.?.read(buf) catch |err| return switch (err) {
+                    error.NotOpenForReading => error.WriteOnly,
+                    error.SystemResources, error.ConnectionTimedOut => error.NotReady,
+                    else => error.Err,
+                };
+                if (ret == 0)
+                    return null;
+                return buf[0..ret];
+            }
+
+            fn interface_seek(user_data: ?*UserData, offset: isize, whence: Whence) anyerror!usize {
+                switch (whence) {
+                    .set => try user_data.?.seekTo(@intCast(offset)),
+                    .cur => try user_data.?.seekBy(@intCast(offset)),
+                    .end => try user_data.?.seekFromEnd(@intCast(offset)),
+                }
+                return @intCast(try user_data.?.getPos());
+            }
+
+            fn interface_size(user_data: ?*UserData) anyerror!usize {
+                return @intCast(try user_data.?.getEndPos());
+            }
+
+            fn interface_write(user_data: ?*UserData, data: []const u8) Error!usize {
+                return user_data.?.write(data) catch |err| switch (err) {
+                    error.NotOpenForWriting => error.ReadOnly,
+                    error.DeviceBusy, error.SystemResources => error.NotReady,
+                    else => error.Err,
+                };
+            }
+
+            const interface = Interface(UserData){
+                .close = &interface_close,
+                .flush = &interface_flush,
+                .read = &interface_read,
+                .seek = &interface_seek,
+                .size = &interface_size,
+                .write = &interface_write,
+            };
+        };
+        return init(
+            FsFileInterface.UserData,
+            FsFileInterface.interface,
+            file,
+        );
+    }
+
     /// Use this function to prepare a read-write memory buffer for use with a stream.
     ///
     /// ## Function Parameters
@@ -640,6 +712,110 @@ pub const Stream = struct {
                 data.len,
             )),
         };
+    }
+
+    /// Get the data type for initializing reader/writer stream interface.
+    ///
+    /// ## Function Parameters
+    /// * `UserData`: The type of user data.
+    ///
+    /// ## Return Value
+    /// Returns the data that must be passed to the `initFromReaderWriter` function.
+    pub fn InitFromReaderWriterData(
+        comptime UserData: type,
+    ) type {
+        return struct {
+            /// Optional reader available to use for the IO stream.
+            io_reader: ?*std.Io.Reader,
+            /// Optional writer available to use for the IO stream.
+            io_writer: ?*std.Io.Writer,
+            /// User data to pass for IO stream callbacks.
+            user_data: UserData,
+        };
+    }
+
+    /// Initialize a stream interface with a reader, writer, and some callback functions.
+    ///
+    /// ## Function Parameters
+    /// * `UserData`: User data type for callback functions.
+    /// * `close_cb`: An optional callback that provides the stream the ability to close, otherwise it is a no-op.
+    /// * `seek_cb`: An optional callback that provides the stream the ability to seek (will error when seeking otherwise).
+    ///     The callback takes the reader and writer passed to this and must return the new absolute position in the stream.
+    /// * `size_cb`: An optional callback that provides the stream the ability to get its total size (will error otherwise).
+    ///     The callback takes the reader and writer passed to this and must return its total size.
+    /// * `data`: Data to pass to the stream callback functions.
+    ///
+    /// ## Return Value
+    /// Returns a stream.
+    ///
+    /// ## Version
+    /// This function is provided by zig-sdl3.
+    pub fn initFromReaderWriter(
+        comptime UserData: type,
+        comptime close_cb: ?*const fn (reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: UserData) anyerror!void,
+        comptime seek_cb: ?*const fn (reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, offset: isize, whence: Whence, user_data: UserData) anyerror!usize,
+        comptime size_cb: ?*const fn (reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: UserData) anyerror!usize,
+        data: *InitFromReaderWriterData(UserData),
+    ) !Stream {
+        const ReaderWriterInterface = struct {
+            const InterfaceUserData = InitFromReaderWriterData(UserData);
+
+            fn interface_close(interface_user_data: ?*InterfaceUserData) anyerror!void {
+                return close_cb.?(interface_user_data.?.io_reader, interface_user_data.?.io_writer, interface_user_data.?.user_data);
+            }
+
+            fn interface_flush(interface_user_data: ?*InterfaceUserData) Error!void {
+                if (interface_user_data.?.io_writer) |val|
+                    val.flush() catch return error.Err;
+            }
+
+            fn interface_read(interface_user_data: ?*InterfaceUserData, buf: []u8) Error!?[]u8 {
+                if (interface_user_data.?.io_reader) |val| {
+                    if (interface_user_data.?.io_writer) |val2|
+                        val2.advance(buf.len);
+                    var stream_writer = std.Io.Writer.fixed(buf);
+                    const read_len = val.stream(&stream_writer, .limited(buf.len)) catch |err| switch (err) {
+                        error.ReadFailed, error.WriteFailed => return error.Err,
+                        error.EndOfStream => return null,
+                    };
+                    return buf[0..read_len];
+                }
+                return error.WriteOnly;
+            }
+
+            fn interface_seek(interface_user_data: ?*InterfaceUserData, offset: isize, whence: Whence) anyerror!usize {
+                return seek_cb.?(interface_user_data.?.io_reader, interface_user_data.?.io_writer, offset, whence, interface_user_data.?.user_data);
+            }
+
+            fn interface_size(interface_user_data: ?*InterfaceUserData) anyerror!usize {
+                return size_cb.?(interface_user_data.?.io_reader, interface_user_data.?.io_writer, interface_user_data.?.user_data);
+            }
+
+            fn interface_write(interface_user_data: ?*InterfaceUserData, io_data: []const u8) Error!usize {
+                if (interface_user_data.?.io_writer) |val| {
+                    const ret = val.write(io_data) catch return error.Err;
+                    if (interface_user_data.?.io_reader) |val2|
+                        val2.discardAll(io_data.len) catch return error.Err;
+                    return ret;
+                } else {
+                    return error.ReadOnly;
+                }
+            }
+
+            const interface = Interface(InterfaceUserData){
+                .close = if (close_cb != null) &interface_close else null,
+                .flush = &interface_flush,
+                .read = &interface_read,
+                .seek = if (seek_cb != null) &interface_seek else null,
+                .size = if (size_cb != null) &interface_size else null,
+                .write = &interface_write,
+            };
+        };
+        return init(
+            ReaderWriterInterface.InterfaceUserData,
+            ReaderWriterInterface.interface,
+            data,
+        );
     }
 
     /// Load all the data from an SDL data stream.
@@ -2004,36 +2180,87 @@ pub fn saveFile(
     ));
 }
 
+var test_global: bool = false;
+
+fn testStreamClose(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: usize) anyerror!void {
+    _ = reader;
+    _ = writer;
+    _ = user_data;
+    test_global = true;
+}
+
+fn testStreamSeek(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, offset: isize, whence: Whence, user_data: usize) anyerror!usize {
+    const seek_pos = switch (whence) {
+        .cur => @as(usize, @intCast(@as(isize, @intCast(reader.?.seek)) + offset)),
+        .set => @as(usize, @intCast(offset)),
+        .end => user_data - @as(usize, @intCast(offset)),
+    };
+    reader.?.seek = seek_pos;
+    writer.?.end = seek_pos;
+    return seek_pos;
+}
+
+fn testStreamSize(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: usize) anyerror!usize {
+    _ = reader;
+    _ = writer;
+    return user_data;
+}
+
 // Stream tests.
 test "Stream" {
     std.testing.refAllDeclsRecursive(@This());
 
-    // // Test stream source.
-    // var buffer: [64]u8 = undefined;
-    // var source: std.io.StreamSource = .{ .buffer = .{ .buffer = &buffer, .pos = 0 } };
-    // const stream = try Stream.initFromStreamSource(&source);
-    // defer stream.deinit() catch {};
-    // try stream.writeU8(7);
-    // try std.testing.expect(buffer[0] == 7);
-    // buffer[1] = 3;
-    // try std.testing.expectEqual(3, try stream.readU8());
-    // try std.testing.expectEqual(64, try stream.getSize());
-    // try std.testing.expectEqual(50, stream.seek(50, .set));
-    // try std.testing.expectEqual(41, stream.seek(23, .end));
-    // try std.testing.expectEqual(43, stream.seek(2, .cur));
+    // Test stream source.
+    var buffer: [64]u8 = undefined;
+    var reader = std.Io.Reader.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
+    var reader_writer_data = Stream.InitFromReaderWriterData(usize){
+        .io_reader = &reader,
+        .io_writer = &writer,
+        .user_data = buffer.len,
+    };
+    const stream = try Stream.initFromReaderWriter(usize, &testStreamClose, &testStreamSeek, &testStreamSize, &reader_writer_data);
+    try stream.writeU8(7);
+    try std.testing.expect(buffer[0] == 7);
+    buffer[1] = 3;
+    try std.testing.expectEqual(3, try stream.readU8());
+    try std.testing.expectEqual(64, try stream.getSize());
+    try std.testing.expectEqual(50, stream.seek(50, .set));
+    try std.testing.expectEqual(41, stream.seek(23, .end));
+    try std.testing.expectEqual(43, stream.seek(2, .cur));
 
-    // // Test writer/reader.
-    // _ = try stream.seek(0, .set);
-    // var writer_buffer: [64]u8 = undefined;
-    // var stream_writer = stream.writer(&writer_buffer);
-    // try stream_writer.interface.print("Hello {s}!", .{"World"});
-    // try stream_writer.interface.flush();
+    // Test writer/reader.
+    _ = try stream.seek(0, .set);
+    var writer_buffer: [64]u8 = undefined;
+    var stream_writer = stream.writer(&writer_buffer);
+    try stream_writer.interface.print("Hello {s}!", .{"World"});
+    try stream_writer.interface.flush();
 
-    // _ = try stream.seek(0, .set);
-    // const hello_world = "Hello World!";
-    // var hello_world_buf: [hello_world.len]u8 = undefined;
-    // var reader_buffer: [64]u8 = undefined;
-    // var stream_reader = stream.reader(&reader_buffer);
-    // try stream_reader.interface.readSliceAll(&hello_world_buf);
-    // try std.testing.expectEqualStrings(hello_world, &hello_world_buf);
+    _ = try stream.seek(0, .set);
+    const hello_world = "Hello World!";
+    var hello_world_buf: [hello_world.len]u8 = undefined;
+    var reader_buffer: [64]u8 = undefined;
+    var stream_reader = stream.reader(&reader_buffer);
+    try stream_reader.interface.readSliceAll(&hello_world_buf);
+    try std.testing.expectEqualStrings(hello_world, &hello_world_buf);
+
+    try stream.deinit();
+    try std.testing.expectEqual(true, test_global);
+
+    // Reader/writer test 2.
+    var reader_writer_data2 = Stream.InitFromReaderWriterData(void){
+        .io_reader = null,
+        .io_writer = &writer,
+        .user_data = {},
+    };
+    reader.seek = 0;
+    writer.end = 0;
+    var stream2 = try Stream.initFromReaderWriter(void, null, null, null, &reader_writer_data2);
+    test_global = false;
+    try stream2.writeS8(-2);
+    try std.testing.expectEqual(error.WriteOnly, stream2.readS8());
+    try stream2.deinit();
+    try std.testing.expectEqual(false, test_global);
+
+    // TODO: FILE INTERFACE TESTS!
 }
