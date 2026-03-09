@@ -1,6 +1,7 @@
 const c = @import("c");
 const errors = @import("errors.zig");
 const std = @import("std");
+const thread = @import("thread.zig");
 
 /// The asynchronous I/O operation structure.
 ///
@@ -21,7 +22,7 @@ pub const File = struct {
     ///
     /// ## Return Value
     /// Returns an IO file.
-    /// This is to be closed with `async_io.Queue.closeFile()`.
+    /// This is to be closed with `Queue.closeFile`.
     ///
     /// ## Remarks
     /// This function supports Unicode filenames, but they must be encoded in UTF-8 format, regardless of the underlying operating system.
@@ -108,7 +109,7 @@ pub const Outcome = struct {
     /// Buffer where data was read/written.
     /// The length of this is what was actually read/written.
     buffer: []u8,
-    /// Offset in the `async_io.File` where data was read/written.
+    /// Offset in the `File` where data was read/written.
     offset: usize,
     /// Number of bytes the task was to read/write.
     bytes_requested: usize,
@@ -178,7 +179,7 @@ pub const Queue = struct {
     /// This function will not block until the tasks have completed.
     ///
     /// Once this function returns true, asyncio is no longer valid, regardless of any future outcomes.
-    /// Any completed tasks might still contain this pointer in their `async_io.Outcome` data, in case the app was using this value to track information,
+    /// Any completed tasks might still contain this pointer in their `Outcome` data, in case the app was using this value to track information,
     /// but it should not be used again.
     ///
     /// If this function returns an error, the close wasn't started at all, and it's safe to attempt to close again later.
@@ -214,17 +215,17 @@ pub const Queue = struct {
     /// All those tasks will be deallocated.
     /// Their results will be lost to the app.
     ///
-    /// Any pending reads from `async_io.Queue.loadFile()` that are still in this queue will have their buffers deallocated by this function, to prevent a memory leak.
+    /// Any pending reads from `loadFile` that are still in this queue will have their buffers deallocated by this function, to prevent a memory leak.
     ///
     /// Once this function is called, the queue is no longer valid and should not be used,
     /// including by other threads that might access it while destruction is blocking on pending tasks.
     ///
-    /// Do not destroy a queue that still has threads waiting on it through `async_io.Queue.waitResult()`.
-    /// You can call `async_io.Queue.signal()` first to unblock those threads, and take measures (such as `thread.Thread.wait()`) to make sure they have finished their wait
+    /// Do not destroy a queue that still has threads waiting on it through `waitResult`.
+    /// You can call `signal` first to unblock those threads, and take measures (such as `thread.Thread.wait`) to make sure they have finished their wait
     /// and won't wait on the queue again.
     ///
     /// ## Thread Safety
-    /// It is safe to call this function from any thread, so long as no other thread is waiting on the queue with `async_io.Queue.waitResult()`.
+    /// It is safe to call this function from any thread, so long as no other thread is waiting on the queue with `waitResult`.
     ///
     /// ## Version
     /// This function is available since SDL 3.2.0.
@@ -301,12 +302,12 @@ pub const Queue = struct {
     /// If the work begins, even failure is asynchronous: a failing return value from this function only means the work couldn't start at all.
     ///
     /// The data is allocated with a zero byte at the end (null terminated) for convenience.
-    /// This extra byte is not included in `async_io.Outcome`'s `buffer.len` value.
+    /// This extra byte is not included in `Outcome`'s `buffer.len` value.
     ///
     /// This function will allocate the buffer to contain the file.
-    /// It must be deallocated by calling `free()` on `async_io.Outcome`'s buffer field after completion.
+    /// It must be deallocated by calling `free` on `Outcome`'s buffer field after completion.
     ///
-    /// An `async_io.Queue` must be specified.
+    /// An `Queue` must be specified.
     /// The newly-created task will be added to it when it completes its work.
     ///
     /// ## Version
@@ -366,17 +367,17 @@ pub const Queue = struct {
         ));
     }
 
-    /// Wake up any threads that are blocking in `async_io.Queue.waitResult()`.
+    /// Wake up any threads that are blocking in `Queue.waitResult`.
     ///
     /// ## Function Parameters
     /// * `self`: The async I/O task queue to signal.
     ///
     /// ## Remarks
-    /// This will unblock any threads that are sleeping in a call to `async_io.Queue.waitResult()` for the specified queue, and cause them to return from that function.
+    /// This will unblock any threads that are sleeping in a call to `Queue.waitResult` for the specified queue, and cause them to return from that function.
     ///
     /// This can be useful when destroying a queue to make sure nothing is touching it indefinitely.
     /// In this case, once this call completes, the caller should take measures to make sure any previously-blocked threads have returned from their wait
-    /// and will not touch the queue again (perhaps by setting a flag to tell the threads to terminate and then using `thread.Thread.wait()` to make sure they've done so).
+    /// and will not touch the queue again (perhaps by setting a flag to tell the threads to terminate and then using `thread.Thread.wait` to make sure they've done so).
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -413,10 +414,10 @@ pub const Queue = struct {
     /// so `timeout_milliseconds` is a maximum wait time, and this function may return false sooner.
     ///
     /// This function may return `null` if there was a system error, the OS inadvertently awoke multiple threads,
-    /// or if `async_io.Queue.signal()` was called to wake up all waiting threads without a finished task.
+    /// or if `Queue.signal` was called to wake up all waiting threads without a finished task.
     ///
     /// A timeout can be used to specify a maximum wait time, but rather than polling, it is possible to have a timeout of `null` to wait forever,
-    /// and use `async_io.Queue.signal()` to wake up the waiting threads later.
+    /// and use `Queue.signal` to wake up the waiting threads later.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
