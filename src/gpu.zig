@@ -2759,7 +2759,7 @@ pub const Device = packed struct {
     ///
     /// ## Remarks
     /// This function will fail if the requested present mode or swapchain composition are unsupported by the device.
-    /// Check if the parameters are supported via `gou.Device.windowSupportsPresentMode()` / `gpu.Device.windowSupportsSwapchainComposition()` prior to calling this function.
+    /// Check if the parameters are supported via `gpu.Device.windowSupportsPresentMode()` / `gpu.Device.windowSupportsSwapchainComposition()` prior to calling this function.
     ///
     /// `gpu.PresentMode.vsync` with `gpu.SwapchainComposition.sdr` are always supported.
     ///
