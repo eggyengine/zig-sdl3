@@ -5350,17 +5350,17 @@ pub const VulkanOptions = extern struct {
     vulkan_api_version: u32,
     /// Pointer to the first element of a chain of Vulkan feature structs.
     /// (Requires API version 1.1 or higher).
-    feature_list: *const anyopaque,
+    feature_list: ?*const anyopaque = null,
     /// Pointer to a `VkPhysicalDeviceFeatures` struct to enable additional Vulkan 1.0 features.
-    vulkan_10_physical_device_features: *const anyopaque,
+    vulkan_10_physical_device_features: ?*const anyopaque = null,
     /// Number of additional device extensions to require.
-    device_extension_count: u32,
+    device_extension_count: u32 = 0,
     /// Pointer to a list of additional device extensions to require.
-    device_extension_names: [*][*:0]const u8,
+    device_extension_names: [*][*:0]const u8 = &.{},
     /// Number of additional instance extensions to require.
-    instance_extension_count: u32,
+    instance_extension_count: u32 = 0,
     /// Pointer to a list of additional instance extensions to require.
-    instance_extension_names: [*][*:0]const u8,
+    instance_extension_names: [*][*:0]const u8 = &.{},
 
     // Size tests.
     comptime {
