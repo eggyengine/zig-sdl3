@@ -1919,10 +1919,10 @@ pub const Device = packed struct {
         /// Convert from an SDL value.
         pub fn fromSdl(value: properties.Group) Properties {
             return .{
-                .name = if (value.get(c.SDL_PROP_GPU_DEVICE_NAME_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
-                .device_driver_name = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
-                .device_driver_version = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
-                .device_driver_info = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_INFO_STRING)) |val| std.mem.span(@as([*c]const u8, @ptrCast(val.pointer.?))) else null,
+                .name = if (value.get(c.SDL_PROP_GPU_DEVICE_NAME_STRING)) |val| val.string else null,
+                .device_driver_name = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING)) |val| val.string else null,
+                .device_driver_version = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING)) |val| val.string else null,
+                .device_driver_info = if (value.get(c.SDL_PROP_GPU_DEVICE_DRIVER_INFO_STRING)) |val| val.string else null,
             };
         }
     };
