@@ -3,12 +3,15 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    branches:
+      - master
 permissions:
   contents: read
 env:
   ZIG_VERSION: 0.15.2
 concurrency:
-  group: "test"
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   docs:

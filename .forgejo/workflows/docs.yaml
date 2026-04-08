@@ -8,7 +8,7 @@ permissions:
 env:
   ZIG_VERSION: 0.15.2
 concurrency:
-  group: "pages"
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   docs:
