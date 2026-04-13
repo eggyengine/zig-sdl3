@@ -1379,7 +1379,7 @@ pub const Window = extern struct {
         cocoa_view: ?struct { value: ?*anyopaque } = null,
         /// The `(__unsafe_unretained) UIWindowScene` associated with the window, defaults to the active window scene.
         /// For iOS, tvOS, and visionOS.
-        window_scene: ?struct { value: ?*anyopaque },
+        window_scene: ?struct { value: ?*anyopaque } = null,
         /// Wayland only.
         /// True if the application wants to use the Wayland surface for a custom role and does not want it attached to an XDG toplevel window.
         /// See SDL3's README/wayland for more information on using custom surfaces.
