@@ -1308,7 +1308,7 @@ pub const WindowId = c.SDL_WindowID;
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Window = packed struct {
+pub const Window = extern struct {
     value: *c.SDL_Window,
 
     // Size tests.

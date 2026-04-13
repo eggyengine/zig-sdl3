@@ -193,7 +193,7 @@ pub fn Interface(comptime UserData: type) type {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Storage = packed struct {
+pub const Storage = extern struct {
     value: *c.SDL_Storage,
 
     /// Copy a file in a writable storage container.

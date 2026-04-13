@@ -190,7 +190,7 @@ pub const Id = packed struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Sensor = packed struct {
+pub const Sensor = extern struct {
     value: *c.SDL_Sensor,
 
     /// Close a sensor previously opened with `Sensor.init()`.

@@ -1493,7 +1493,7 @@ pub const ReallocFuncC = *const fn (
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Environment = packed struct {
+pub const Environment = extern struct {
     value: *c.SDL_Environment,
 
     /// Destroy a set of environment variables.

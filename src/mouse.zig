@@ -229,7 +229,7 @@ pub const WheelDirection = enum(c_uint) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Cursor = packed struct {
+pub const Cursor = extern struct {
     value: *c.SDL_Cursor,
 
     /// Free a previously-created cursor.

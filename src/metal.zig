@@ -3,7 +3,7 @@ const std = @import("std");
 const video = @import("video.zig");
 
 /// A handle to a `CAMetalLayer`-backed `NSView` (macOS) or `UIView` (iOS/tvOS).
-pub const View = packed struct {
+pub const View = extern struct {
     value: *anyopaque,
 
     /// Destroy an existing `View` object.
