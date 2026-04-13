@@ -67,7 +67,7 @@ pub const State = enum(c.SDL_ThreadState) {
 ///
 /// ## Version
 /// This datatype is available since SDL 3.2.0.
-pub const Thread = packed struct {
+pub const Thread = extern struct {
     value: *c.SDL_Thread,
 
     /// Properties to use for thread creation.

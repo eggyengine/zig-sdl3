@@ -1036,7 +1036,7 @@ pub const Device = packed struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Stream = packed struct {
+pub const Stream = extern struct {
     value: *c.SDL_AudioStream,
 
     // Size tests.

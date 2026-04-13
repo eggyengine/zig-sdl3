@@ -107,7 +107,7 @@ pub const Timeout = union(enum) {
 ///
 /// ## Version
 /// This datatype is available since SDL_net 3.0.0.
-pub const Address = packed struct {
+pub const Address = extern struct {
     value: *c.NET_Address,
 
     /// Status of an address resolution.

@@ -31,7 +31,7 @@ pub const software_renderer_name = c.SDL_SOFTWARE_RENDERER;
 ///
 /// ## Version
 /// This struct is available since SDL 3.4.0.
-pub const GpuRenderState = packed struct {
+pub const GpuRenderState = extern struct {
     value: *c.SDL_GPURenderState,
 
     /// Destroy custom GPU render state.

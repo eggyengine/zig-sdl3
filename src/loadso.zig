@@ -6,7 +6,7 @@ const std = @import("std");
 ///
 /// ## Version
 /// This datatype is available since SDL 3.2.0.
-pub const SharedObject = packed struct {
+pub const SharedObject = extern struct {
     value: *c.SDL_SharedObject,
 
     /// Dynamically load a shared object.

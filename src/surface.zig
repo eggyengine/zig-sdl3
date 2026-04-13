@@ -109,7 +109,7 @@ pub const ScaleMode = enum(c.SDL_ScaleMode) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Surface = packed struct {
+pub const Surface = extern struct {
     value: *c.SDL_Surface,
 
     // Size tests.

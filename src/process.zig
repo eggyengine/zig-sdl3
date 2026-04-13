@@ -8,7 +8,7 @@ const std = @import("std");
 /// An opaque handle representing a system process.
 ///
 /// This datatype is available since SDL 3.2.0.
-pub const Process = packed struct {
+pub const Process = extern struct {
     value: *c.SDL_Process,
 
     /// Description of where standard I/O should be directed when creating a process.

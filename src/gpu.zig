@@ -196,7 +196,7 @@ pub const BlitRegion = struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Buffer = packed struct {
+pub const Buffer = extern struct {
     value: *c.SDL_GPUBuffer,
 };
 
@@ -584,7 +584,7 @@ pub const ColorTargetInfo = extern struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const CommandBuffer = packed struct {
+pub const CommandBuffer = extern struct {
     value: *c.SDL_GPUCommandBuffer,
 
     /// Acquire a texture to use in presentation.
@@ -1076,7 +1076,7 @@ pub const CompareOperation = enum(c.SDL_GPUCompareOp) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const ComputePass = packed struct {
+pub const ComputePass = extern struct {
     value: *c.SDL_GPUComputePass,
 
     /// Binds a compute pipeline on a command buffer for use in compute dispatch.
@@ -1260,7 +1260,7 @@ pub const ComputePass = packed struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const ComputePipeline = packed struct {
+pub const ComputePipeline = extern struct {
     value: *c.SDL_GPUComputePipeline,
 };
 
@@ -1372,7 +1372,7 @@ pub const ComputePipelineCreateInfo = struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const CopyPass = packed struct {
+pub const CopyPass = extern struct {
     value: *c.SDL_GPUCopyPass,
 
     /// Performs a buffer-to-buffer copy.
@@ -1735,7 +1735,7 @@ pub const DepthStencilTargetInfo = struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Device = packed struct {
+pub const Device = extern struct {
     value: *c.SDL_GPUDevice,
 
     /// GPU create properties.
@@ -2992,7 +2992,7 @@ pub const Device = packed struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Fence = packed struct {
+pub const Fence = extern struct {
     value: *c.SDL_GPUFence,
 };
 
@@ -3036,7 +3036,7 @@ pub const FrontFace = enum(c.SDL_GPUFrontFace) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const GraphicsPipeline = packed struct {
+pub const GraphicsPipeline = extern struct {
     value: *c.SDL_GPUGraphicsPipeline,
 };
 
@@ -3425,7 +3425,7 @@ pub const RasterizerState = struct {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const RenderPass = packed struct {
+pub const RenderPass = extern struct {
     value: *c.SDL_GPURenderPass,
 
     /// Binds texture-sampler pairs for use on the fragment shader.
@@ -3893,7 +3893,7 @@ pub const SampleCount = enum(c.SDL_GPUSampleCount) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Sampler = packed struct {
+pub const Sampler = extern struct {
     value: *c.SDL_GPUSampler,
 };
 
@@ -4023,7 +4023,7 @@ pub const SamplerMipmapMode = enum(c.SDL_GPUSamplerMipmapMode) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Shader = packed struct {
+pub const Shader = extern struct {
     value: *c.SDL_GPUShader,
 };
 
@@ -4368,7 +4368,7 @@ pub const SwapchainComposition = enum(c.SDL_GPUSwapchainComposition) {
 ///
 /// ## Version
 /// This struct is available since SDL 3.2.0.
-pub const Texture = packed struct {
+pub const Texture = extern struct {
     value: ?*c.SDL_GPUTexture,
 
     // Size tests.
