@@ -3060,7 +3060,7 @@ pub fn flushGroup(
 ///
 /// This function is available since SDL 3.2.0.
 pub fn getFilter() ?struct { FilterC, ?*anyopaque } {
-    var event_filter: c.SDL_FunctionPointer = undefined;
+    var event_filter: c.SDL_EventFilter = undefined;
     var user_data: ?*anyopaque = undefined;
     const ret = c.SDL_GetEventFilter(&event_filter, &user_data);
     if (!ret)
