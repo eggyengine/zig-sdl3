@@ -1,7 +1,7 @@
 .{
     .name = .sdl3,
     .version = "0.1.9",
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .sdl = .{
             .url = "git+https://github.com/castholm/SDL.git?ref=v0.4.0%2B3.4.0#ae5deb068787bd71d9aadbc054ff1af54f5d058c",
