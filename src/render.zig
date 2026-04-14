@@ -3681,5 +3681,5 @@ pub fn getRenderer(
 
 // Render tests.
 test "Render" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

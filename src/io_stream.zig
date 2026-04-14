@@ -2208,7 +2208,7 @@ fn testStreamSize(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: u
 
 // Stream tests.
 test "Stream" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     // Test stream source.
     var buffer: [64]u8 = undefined;

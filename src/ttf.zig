@@ -3824,3 +3824,7 @@ pub const SubString = struct {
         };
     }
 };
+
+test {
+    std.testing.refAllDecls(@This());
+}

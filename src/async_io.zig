@@ -509,5 +509,5 @@ pub const TaskType = enum(c.SDL_AsyncIOTaskType) {
 
 // Test asynchronous IO.
 test "Async IO" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -241,3 +241,7 @@ pub export fn SDL_AppQuit(
         root.quit(@ptrCast(@alignCast(app_state)), @enumFromInt(result));
     }
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}

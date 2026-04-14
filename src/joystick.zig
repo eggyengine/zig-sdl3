@@ -1723,5 +1723,5 @@ pub fn update() void {
 
 // Joystick tests.
 test "Joystick" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

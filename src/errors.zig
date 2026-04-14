@@ -343,7 +343,7 @@ pub fn wrapCallNull(
 
 // Make sure error getting and setting works properly.
 test "Error" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     clear();
     callErrorCallback();

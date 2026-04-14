@@ -562,7 +562,7 @@ fn testGetLastMessage(data: TestLogCallbackData) []const u8 {
 
 // Test logging functionality.
 test "Log" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     const backup_callback, const backup_user_data = getLogOutputFunction();
     try std.testing.expectEqual(getDefaultLogOutputFunction(), backup_callback);

@@ -3481,7 +3481,7 @@ fn dummyFilter(
 
 // Test SDL events.
 test "Events" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     defer sdl3.shutdown();
     try sdl3.init(.{ .events = true });

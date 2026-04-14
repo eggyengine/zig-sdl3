@@ -334,7 +334,7 @@ pub fn getLocalePreferences() !struct { DateFormat, TimeFormat } {
 
 // Ensure time and date recognition works.
 test "Dates" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     try std.testing.expect(try getDaysInMonth(2018, Month.february) == 28);
     try std.testing.expect(try getDaysInMonth(2020, Month.february) == 29);

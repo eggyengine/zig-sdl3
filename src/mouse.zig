@@ -929,5 +929,5 @@ pub fn warpInWindow(
 
 // Mouse related tests.
 test "Mouse" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -321,5 +321,5 @@ pub fn sdlLogZigLog(
 }
 
 test "extra" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

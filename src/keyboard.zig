@@ -694,5 +694,5 @@ pub fn textInputActive(
 
 // Test keyboard functions.
 test "Keyboard" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

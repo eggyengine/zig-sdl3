@@ -124,7 +124,7 @@ pub const sse42 = @hasDecl(c, "SDL_SSE4_2_INTRINSICS");
 
 // Intrinsic tests.
 test "Intin" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     _ = altivec;
     _ = avx;
