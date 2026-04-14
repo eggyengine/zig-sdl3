@@ -56,7 +56,7 @@ pub const Finger = extern struct {
 ///
 /// ## Version
 /// This datatype is available since SDL 3.2.0.
-pub const FingerId = packed struct {
+pub const FingerId = extern struct {
     value: c.SDL_FingerID,
 };
 
