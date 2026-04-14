@@ -621,10 +621,10 @@ pub const Stream = struct {
     /// ## Version
     /// This function is provided by zig-sdl3.
     pub fn initFromFsFile(
-        file: *std.fs.File,
+        file: *std.Io.File,
     ) !Stream {
         const FsFileInterface = struct {
-            const UserData = std.fs.File;
+            const UserData = std.Io.File;
 
             fn interface_close(user_data: ?*UserData) anyerror!void {
                 user_data.?.close();
