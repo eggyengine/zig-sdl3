@@ -62,10 +62,10 @@ pub export fn SDL_AppInit(
     arg_values: [*][*:0]u8,
 ) callconv(.c) c.SDL_AppResult {
     if (@hasDecl(root, "init")) {
-        const ret = root.init(@alignCast(@ptrCast(app_state)), arg_values[0..@intCast(arg_count)]) catch |err| {
+        const ret = root.init(@ptrCast(@alignCast(app_state)), arg_values[0..@intCast(arg_count)]) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
-                std.debug.dumpStackTrace(trace.*);
+                std.debug.dumpErrorReturnTrace(trace);
             }
             return c.SDL_APP_FAILURE;
         };
@@ -127,10 +127,10 @@ pub export fn SDL_AppIterate(
     app_state: ?*anyopaque,
 ) c.SDL_AppResult {
     if (@hasDecl(root, "iterate")) {
-        const ret = root.iterate(@alignCast(@ptrCast(app_state))) catch |err| {
+        const ret = root.iterate(@ptrCast(@alignCast(app_state))) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
-                std.debug.dumpStackTrace(trace.*);
+                std.debug.dumpErrorReturnTrace(trace);
             }
             return c.SDL_APP_FAILURE;
         };
@@ -184,10 +184,10 @@ pub export fn SDL_AppEvent(
     event: *c.SDL_Event,
 ) callconv(.c) c.SDL_AppResult {
     if (@hasDecl(root, "event")) {
-        const ret = root.event(@alignCast(@ptrCast(app_state)), events.Event.fromSdl(event.*)) catch |err| {
+        const ret = root.event(@ptrCast(@alignCast(app_state)), events.Event.fromSdl(event.*)) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
-                std.debug.dumpStackTrace(trace.*);
+                std.debug.dumpErrorReturnTrace(trace);
             }
             return c.SDL_APP_FAILURE;
         };
@@ -238,6 +238,6 @@ pub export fn SDL_AppQuit(
     result: c.SDL_AppResult,
 ) callconv(.c) void {
     if (@hasDecl(root, "quit")) {
-        root.quit(@alignCast(@ptrCast(app_state)), @enumFromInt(result));
+        root.quit(@ptrCast(@alignCast(app_state)), @enumFromInt(result));
     }
 }

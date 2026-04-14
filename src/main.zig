@@ -54,10 +54,10 @@ pub fn enterAppMainCallbacks(
     const Cb = struct {
         pub fn init(app_state_c: [*c]?*anyopaque, arg_count_c: c_int, arg_values_c: [*c][*c]u8) callconv(.c) c_uint {
             if (app_init) |cb| {
-                const ret = cb(@alignCast(@ptrCast(app_state_c)), @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch |err| {
+                const ret = cb(@ptrCast(@alignCast(app_state_c)), @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch |err| {
                     std.log.err("{s}", .{@errorName(err)});
                     if (@errorReturnTrace()) |trace| {
-                        std.debug.dumpStackTrace(trace.*);
+                        std.debug.dumpErrorReturnTrace(trace);
                     }
                     return c.SDL_APP_FAILURE;
                 };
@@ -67,10 +67,10 @@ pub fn enterAppMainCallbacks(
         }
         pub fn iterate(app_state_c: ?*anyopaque) callconv(.c) c_uint {
             if (app_iterate) |cb| {
-                const ret = cb(@alignCast(@ptrCast(app_state_c))) catch |err| {
+                const ret = cb(@ptrCast(@alignCast(app_state_c))) catch |err| {
                     std.log.err("{s}", .{@errorName(err)});
                     if (@errorReturnTrace()) |trace| {
-                        std.debug.dumpStackTrace(trace.*);
+                        std.debug.dumpErrorReturnTrace(trace);
                     }
                     return c.SDL_APP_FAILURE;
                 };
@@ -80,10 +80,10 @@ pub fn enterAppMainCallbacks(
         }
         pub fn event(app_state_c: ?*anyopaque, event_c: [*c]c.SDL_Event) callconv(.c) c_uint {
             if (app_event) |cb| {
-                const ret = cb(@alignCast(@ptrCast(app_state_c)), events.Event.fromSdl(event_c.*)) catch |err| {
+                const ret = cb(@ptrCast(@alignCast(app_state_c)), events.Event.fromSdl(event_c.*)) catch |err| {
                     std.log.err("{s}", .{@errorName(err)});
                     if (@errorReturnTrace()) |trace| {
-                        std.debug.dumpStackTrace(trace.*);
+                        std.debug.dumpErrorReturnTrace(trace);
                     }
                     return c.SDL_APP_FAILURE;
                 };
@@ -93,7 +93,7 @@ pub fn enterAppMainCallbacks(
         }
         pub fn quit(app_state_c: ?*anyopaque, result_c: c_uint) callconv(.c) void {
             if (app_quit) |cb| {
-                cb(@alignCast(@ptrCast(app_state_c)), @enumFromInt(result_c));
+                cb(@ptrCast(@alignCast(app_state_c)), @enumFromInt(result_c));
             }
         }
     };
@@ -167,7 +167,7 @@ pub fn runApp(
             main_function(@as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch |err| {
                 std.log.err("{s}", .{@errorName(err)});
                 if (@errorReturnTrace()) |trace| {
-                    std.debug.dumpStackTrace(trace.*);
+                    std.debug.dumpErrorReturnTrace(trace);
                 }
                 return 1;
             };
