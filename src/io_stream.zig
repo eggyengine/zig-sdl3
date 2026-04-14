@@ -621,13 +621,14 @@ pub const Stream = struct {
     /// ## Version
     /// This function is provided by zig-sdl3.
     pub fn initFromFsFile(
+        io: std.Io,
         file: *std.Io.File,
     ) !Stream {
         const FsFileInterface = struct {
-            const UserData = std.Io.File;
+            const UserData = struct { file: std.Io.File, io: std.Io };
 
             fn interface_close(user_data: ?*UserData) anyerror!void {
-                user_data.?.close();
+                user_data.?.file.close(user_data.?.io);
             }
 
             fn interface_flush(user_data: ?*UserData) Error!void {
@@ -635,7 +636,8 @@ pub const Stream = struct {
             }
 
             fn interface_read(user_data: ?*UserData, buf: []u8) Error!?[]u8 {
-                const ret = user_data.?.read(buf) catch |err| return switch (err) {
+                const io_ = user_data.?.io;
+                const ret = user_data.?.file.read(io_, buf) catch |err| return switch (err) {
                     error.NotOpenForReading => error.WriteOnly,
                     error.SystemResources, error.ConnectionTimedOut => error.NotReady,
                     else => error.Err,
@@ -646,20 +648,21 @@ pub const Stream = struct {
             }
 
             fn interface_seek(user_data: ?*UserData, offset: isize, whence: Whence) anyerror!usize {
+                const io_ = user_data.?.io;
                 switch (whence) {
-                    .set => try user_data.?.seekTo(@intCast(offset)),
-                    .cur => try user_data.?.seekBy(@intCast(offset)),
-                    .end => try user_data.?.seekTo((try user_data.?.getEndPos()) - @as(u64, @intCast(offset))),
+                    .set => try user_data.?.file.seekTo(io_, @intCast(offset)),
+                    .cur => try user_data.?.file.seekBy(io_, @intCast(offset)),
+                    .end => try user_data.?.file.seekTo(io_, (try user_data.?.file.getEndPos(io)) - @as(u64, @intCast(offset))),
                 }
-                return @intCast(try user_data.?.getPos());
+                return @intCast(try user_data.?.file.getPos());
             }
 
             fn interface_size(user_data: ?*UserData) anyerror!usize {
-                return @intCast(try user_data.?.getEndPos());
+                return @intCast(try user_data.?.file.getEndPos(user_data.?.io));
             }
 
             fn interface_write(user_data: ?*UserData, data: []const u8) Error!usize {
-                return user_data.?.write(data) catch |err| switch (err) {
+                return user_data.?.file.writeStreamingAll(user_data.?.io, data) catch |err| switch (err) {
                     error.NotOpenForWriting => error.ReadOnly,
                     error.DeviceBusy, error.SystemResources => error.NotReady,
                     else => error.Err,
@@ -1543,7 +1546,7 @@ pub const Stream = struct {
     pub const Reader = struct {
         stream: Stream,
         err: ?Error = null,
-        interface: std.io.Reader,
+        interface: std.Io.Reader,
 
         pub fn init(stream: Stream, buffer: []u8) Reader {
             return .{
@@ -1557,7 +1560,7 @@ pub const Stream = struct {
             };
         }
 
-        fn streamFn(r: *std.io.Reader, w: *std.io.Writer, limit: std.io.Limit) std.io.Reader.StreamError!usize {
+        fn streamFn(r: *std.Io.Reader, w: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
             const self: *@This() = @alignCast(@fieldParentPtr("interface", r));
             const dest = limit.slice(try w.writableSliceGreedy(1));
             const bytes_read = self.stream.read(dest) catch |err| {
@@ -2056,7 +2059,7 @@ pub const Stream = struct {
     pub const Writer = struct {
         stream: Stream,
         err: ?Error = null,
-        interface: std.io.Writer,
+        interface: std.Io.Writer,
 
         pub fn init(stream: Stream, buffer: []u8) Writer {
             return .{
@@ -2068,14 +2071,14 @@ pub const Stream = struct {
             };
         }
 
-        fn doWrite(self: *@This(), buf: []const u8) std.io.Writer.Error!usize {
+        fn doWrite(self: *@This(), buf: []const u8) std.Io.Writer.Error!usize {
             return self.stream.write(buf) catch |err| {
                 self.err = err;
                 return error.WriteFailed;
             };
         }
 
-        fn drainFn(w: *std.io.Writer, data: []const []const u8, splat: usize) std.io.Writer.Error!usize {
+        fn drainFn(w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
             const self: *@This() = @alignCast(@fieldParentPtr("interface", w));
             var written_total: usize = 0;
 
@@ -2210,6 +2213,8 @@ fn testStreamSize(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: u
 test "Stream" {
     std.testing.refAllDecls(@This());
 
+    const io = std.testing.io;
+
     // Test stream source.
     var buffer: [64]u8 = undefined;
     var reader = std.Io.Reader.fixed(&buffer);
@@ -2264,11 +2269,11 @@ test "Stream" {
 
     // Test file interface.
     if (@import("builtin").os.tag == .linux) {
-        var tmp_dir = try std.fs.openDirAbsolute("/tmp", .{});
-        defer tmp_dir.close();
+        var tmp_dir = try std.Io.Dir.openDirAbsolute(io, "/tmp", .{});
+        defer tmp_dir.close(io);
 
-        var tmp_file = try tmp_dir.createFile("iostream_test", .{ .read = true });
-        const sdl_stream = try Stream.initFromFsFile(&tmp_file);
+        var tmp_file = try tmp_dir.createFile(io, "iostream_test", .{ .read = true });
+        const sdl_stream = try Stream.initFromFsFile(io, &tmp_file);
         try sdl_stream.writeU8(7);
         try sdl_stream.writeU8(3);
         try std.testing.expectEqual(0, sdl_stream.seek(0, .set));
