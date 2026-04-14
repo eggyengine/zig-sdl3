@@ -2525,7 +2525,7 @@ pub const Event = union(Type) {
 
     // Size tests.
     comptime {
-        std.debug.assert(@sizeOf(c.SDL_Event) == @sizeOf(Event));
+        std.debug.assert(@sizeOf(c.SDL_Event) <= @sizeOf(Event));
     }
 
     /// Create a managed event from an SDL event.
@@ -2663,26 +2663,6 @@ pub const Event = union(Type) {
             c.SDL_EVENT_ENUM_PADDING => .{ .padding = @splat(0) },
             else => .{ .unknown = @FieldType(Event, "unknown").fromSdl(event) },
         };
-    }
-
-    /// Create a managed event from an SDL event in place.
-    ///
-    /// ## Function Parameters
-    /// * `event`: SDL event to manage. The `event` passed in will be unusable after.
-    ///
-    /// ## Return Value
-    /// A managed event union.
-    ///
-    /// ## Remarks
-    /// This will modify memory in-place.
-    /// This means that using the `event` passed into this afterwards will result in undefined behavior.
-    ///
-    /// ## Version
-    /// This function is provided by zig-sdl3.
-    pub fn fromSdlInPlace(event: *c.SDL_Event) *Event {
-        const managed: *Event = @ptrCast(event);
-        managed.* = fromSdl(event.*);
-        return managed;
     }
 
     /// Generate an English description of an event.
@@ -3155,10 +3135,20 @@ pub fn peep(
     group: Group,
 ) !usize {
     const min, const max = group.minMax();
-    const raw: [*]c.SDL_Event = @ptrCast(events.ptr); // Hacky! We ensure in unit tests our enum is the same size so we can do this, then convert in-place.
+
+    // Hacky! We ensure in unit tests our enum is the same size or larger so we can do this.
+    // If they are of the same size its just in-place conversion if zig events are larger provided buffer will be longer so coping in reverse still works.
+    // /-----------------\
+    // |  a  |  b  |  c  |  - [*]c.SDL_Events
+    // |---------------------------
+    // |   a    |   b    |   c    | - []Event
+    // \--------------------------/
+    // Coping shorter item to longer item can only destroy source item but not any item before.
+    const raw: [*]c.SDL_Event = @ptrCast(events.ptr);
     const ret = c.SDL_PeepEvents(raw, @intCast(events.len), @intFromEnum(action), min, max);
     for (0..@intCast(ret)) |ind| {
-        _ = Event.fromSdlInPlace(&raw[ind]);
+        const rev_ind = events.len - ind - 1;
+        events[rev_ind] = Event.fromSdl(raw[rev_ind]);
     }
     return @intCast(try errors.wrapCall(c_int, ret, -1));
 }
