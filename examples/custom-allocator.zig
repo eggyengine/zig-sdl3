@@ -10,7 +10,10 @@ pub fn main() !void {
     // Setup custom allocator.
     var debug_allocator = std.heap.DebugAllocator(.{}).init;
     _ = try sdl3.setMemoryFunctionsByAllocator(debug_allocator.allocator());
-    defer if (debug_allocator.detectLeaks()) @panic("Memory leaks detected!");
+    defer {
+        const leaks = debug_allocator.detectLeaks();
+        if (leaks != 0) std.debug.panic("{d} memory leaks detected!", .{leaks});
+    }
 
     // Shutdown SDL.
     defer sdl3.shutdown();
