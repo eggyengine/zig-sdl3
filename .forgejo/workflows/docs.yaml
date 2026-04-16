@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 env:
-  ZIG_VERSION: 0.15.2
+  ZIG_VERSION: 0.16.0
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
