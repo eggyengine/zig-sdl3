@@ -2367,5 +2367,5 @@ pub fn unbindStreams(
 
 // Audio related tests.
 test "Audio" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

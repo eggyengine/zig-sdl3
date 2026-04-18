@@ -173,7 +173,7 @@ pub const Mode = enum(c.SDL_BlendMode) {
 
 // Test blend mode creation.
 test "Blend Mode" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     try std.testing.expect(Mode.custom(
         .source_color,

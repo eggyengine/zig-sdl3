@@ -219,5 +219,5 @@ pub fn unloadLibrary() void {
 
 // Vulkan related testing.
 test "Vulkan" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

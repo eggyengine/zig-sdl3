@@ -1,7 +1,7 @@
 .{
     .name = .sdl3,
-    .version = "0.1.9",
-    .minimum_zig_version = "0.15.1",
+    .version = "0.2.0",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .sdl = .{
             .url = "git+https://github.com/castholm/SDL.git?ref=v0.4.0%2B3.4.0#ae5deb068787bd71d9aadbc054ff1af54f5d058c",
@@ -23,12 +23,12 @@
             .lazy = true,
         },
         .harfbuzz = .{
-            .url = "git+https://github.com/allyourcodebase/harfbuzz.git#ad51d895b69c262d3a497e1c3b54116dd8090f04",
-            .hash = "harfbuzz-12.2.0-Ip1VAuGZAACtg3OS6D_eeeoVX5-8Er8x-JzZejxOI8Zp",
+            .url = "git+https://github.com/allyourcodebase/harfbuzz#d055840ecefefcd57f5ddeb2fa8c83fafed1a40b",
+            .hash = "harfbuzz-14.1.0-Ip1VAuGZAAC1jdxPHOMPoHyi-50Hm_q4bveaVflELHGw",
         },
         .freetype = .{
-            .url = "git+https://github.com/allyourcodebase/freetype.git#1082522e99fcc2554ca849cf5042878a371b5bd2",
-            .hash = "freetype-2.14.1-C3-WdWqKAADJcxSH2bo9uMDiBAoDcIhOSl1-DADGIIM2",
+            .url = "git+https://github.com/allyourcodebase/freetype#884fd2235e6ae1ec4306eda30b3259f20930ed2e",
+            .hash = "freetype-2.14.3-C3-WdXSKAAB-kHs4qgRoeoFnRkNQn6M_SSlUGZ6ywgBQ",
         },
     },
     .paths = .{

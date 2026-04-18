@@ -542,7 +542,7 @@ pub fn getNumDrivers() usize {
 
 // Test camera functionality.
 test "Camera" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     // Global functions.
     const num_drivers = getNumDrivers();

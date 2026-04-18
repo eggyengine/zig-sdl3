@@ -841,5 +841,5 @@ pub fn waitUntilInputAvailable(allocator: std.mem.Allocator, sockets: []const Po
 }
 
 test "net" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -1,10 +1,10 @@
 const sdl3 = @import("sdl3");
 const std = @import("std");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_file_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    var out = stdout_file_writer.interface;
+    var stdout_file_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
+    const out = &stdout_file_writer.interface;
 
     // Paths available.
     try out.print("Application Directory: \"{s}\"\n", .{try sdl3.filesystem.getBasePath()});

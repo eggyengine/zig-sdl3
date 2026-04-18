@@ -36,5 +36,5 @@ pub fn openURL(
 
 // Misc tests.
 test "Misc" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -1,28 +1,12 @@
 const c = @import("c");
-const errors = @import(
-    "errors.zig",
-);
-const gpu = @import(
-    "gpu.zig",
-);
-const io_stream = @import(
-    "io_stream.zig",
-);
-const properties = @import(
-    "properties.zig",
-);
-const rect = @import(
-    "rect.zig",
-);
-const render = @import(
-    "render.zig",
-);
-const std = @import(
-    "std",
-);
-const surface = @import(
-    "surface.zig",
-);
+const errors = @import("errors.zig");
+const gpu = @import("gpu.zig");
+const io_stream = @import("io_stream.zig");
+const properties = @import("properties.zig");
+const rect = @import("rect.zig");
+const render = @import("render.zig");
+const std = @import("std");
+const surface = @import("surface.zig");
 
 comptime {
     if (!@hasDecl(c, "TTF_GetFreeTypeVersion"))

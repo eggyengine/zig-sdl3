@@ -476,7 +476,7 @@ pub const KeyModifier = struct {
 
 // Keycode testing.
 test "Keycode" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     const code = Keycode.fromScancode(.a).?;
     try std.testing.expect(code.isScancode());

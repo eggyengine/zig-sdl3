@@ -231,5 +231,5 @@ pub fn setX11EventHook(
 
 // System tests.
 test "System" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

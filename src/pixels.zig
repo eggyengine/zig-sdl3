@@ -1850,5 +1850,5 @@ inline fn OrderType(
 
 // Pixel tests.
 test "Pixels" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

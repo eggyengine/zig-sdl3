@@ -5,14 +5,12 @@ const fps = 60;
 const screen_width = 640;
 const screen_height = 480;
 
-pub fn main() !void {
-
-    // Setup custom allocator.
-    var debug_allocator = std.heap.DebugAllocator(.{}).init;
-    _ = try sdl3.setMemoryFunctionsByAllocator(debug_allocator.allocator());
-    defer if (debug_allocator.detectLeaks()) @panic("Memory leaks detected!");
+pub fn main(
+    init: std.process.Init,
+) !void {
 
     // Shutdown SDL.
+    _ = try sdl3.setMemoryFunctionsByAllocator(init.gpa);
     defer sdl3.shutdown();
 
     // Initialize SDL with subsystems you need here.

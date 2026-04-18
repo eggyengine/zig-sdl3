@@ -51,7 +51,9 @@ fn quit(
     state.quit = true;
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+
     defer sdl3.shutdown();
 
     // Initialize the video subsystem as it is needed.
@@ -60,7 +62,7 @@ pub fn main() !void {
     defer sdl3.quit(init_flags);
 
     // Initialize RNG and create app icon.
-    var prng = std.Random.DefaultPrng.init(@bitCast(std.time.microTimestamp()));
+    var prng = std.Random.DefaultPrng.init(@bitCast(std.Io.Timestamp.now(io, .real).toMicroseconds()));
     var state = State{
         .surface = try sdl3.surface.Surface.init(32, 32, .array_rgba_32),
         .random = prng.random(),

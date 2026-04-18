@@ -63,5 +63,5 @@ pub const View = extern struct {
 
 // Metal glue layer tests.
 test "Metal" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

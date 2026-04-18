@@ -5424,7 +5424,7 @@ pub fn supportsProperties(
 
 // Test the GPU.
 test "Gpu" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     _ = BufferBinding{
         .buffer = undefined,

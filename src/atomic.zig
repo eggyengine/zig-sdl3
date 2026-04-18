@@ -519,5 +519,5 @@ pub fn setPointer(
 
 // Atomic testing.
 test "Atomic" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

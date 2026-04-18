@@ -303,5 +303,5 @@ pub fn showSimple(
 
 // Message box tests.
 test "Message Box" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

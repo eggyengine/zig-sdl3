@@ -344,7 +344,7 @@ pub fn hasSse42() bool {
 
 // CPU testing.
 test "CPU Info" {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 
     _ = cacheline_size;
     _ = getCacheLineSize();

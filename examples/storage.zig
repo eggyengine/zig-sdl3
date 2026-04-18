@@ -1,13 +1,13 @@
 const sdl3 = @import("sdl3");
 const std = @import("std");
 
-pub fn main() !void {
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_file_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    var out = stdout_file_writer.interface;
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const allocator = init.gpa;
 
-    // Setup an allocator.
-    const allocator = std.heap.smp_allocator;
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_file_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const out = &stdout_file_writer.interface;
 
     // Get storage.
     const storage = try sdl3.storage.Storage.initTitle(null, null);

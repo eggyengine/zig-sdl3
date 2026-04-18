@@ -6,10 +6,10 @@ const screen_height: c_int = 600;
 
 const fps = 60;
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-    defer _ = gpa.deinit();
+pub fn main(
+    init: std.process.Init,
+) !void {
+    var allocator = init.gpa;
 
     const log_app = sdl3.log.Category.application;
 
