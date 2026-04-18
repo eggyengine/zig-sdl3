@@ -67,7 +67,7 @@ fn buildWeb(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     const sdl_module = sdl3.module("sdl3");
     sdl_module.addSystemIncludePath(emsdk_sysroot_include_path);
     wasm.root_module.addImport("sdl3", sdl3.module("sdl3"));
-    wasm.addSystemIncludePath(emsdk_sysroot_include_path);
+    wasm.root_module.addSystemIncludePath(emsdk_sysroot_include_path);
 
     const emcc_flags = zemscripten.emccDefaultFlags(b.allocator, .{
         .optimize = optimize,

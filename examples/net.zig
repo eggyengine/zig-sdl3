@@ -11,15 +11,15 @@ const server_poll_timeout_ms: u32 = 100;
 const recv_buffer_size = 1024;
 
 var server_should_stop: bool = false;
-var server_ready_sem = std.Thread.Semaphore{ .permits = 0 };
+var server_ready_sem = std.Io.Semaphore{ .permits = 0 };
 
-fn serverThread(allocator: std.mem.Allocator, log_server: sdl3.log.Category, sem: *std.Thread.Semaphore, port: u16) !void {
+fn serverThread(io: std.Io, allocator: std.mem.Allocator, log_server: sdl3.log.Category, sem: *std.Io.Semaphore, port: u16) !void {
     const server: sdl3.net.Server = try .init(null, port);
     defer server.deinit();
     try log_server.logInfo("Server: Listening on port {d}", .{port});
 
     // Signal that the server is ready to accept connections.
-    sem.post();
+    sem.post(io);
 
     while (!server_should_stop) {
         const sockets = &.{sdl3.net.Pollable{ .server = server }};
@@ -107,8 +107,10 @@ fn clientThread(allocator: std.mem.Allocator, log_client: sdl3.log.Category, por
     try log_client.logInfo("Client: Shutting down.", .{});
 }
 
-pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+pub fn main(
+    init: std.process.Init,
+) !void {
+    const allocator = init.gpa;
 
     try sdl3.init(.{});
     defer sdl3.quit(.{});
@@ -123,7 +125,7 @@ pub fn main() !void {
 
     var prng: std.Random.DefaultPrng = .init(blk: {
         var seed: u64 = undefined;
-        std.crypto.random.bytes(std.mem.asBytes(&seed));
+        init.io.random(std.mem.asBytes(&seed));
         break :blk seed;
     });
     const rand = prng.random();
@@ -132,10 +134,10 @@ pub fn main() !void {
 
     try sdl3.log.log("SDL_net version: {any}", .{sdl3.net.getVersion()});
 
-    var server_thread: std.Thread = try .spawn(.{}, serverThread, .{ allocator, log_server, &server_ready_sem, port });
+    var server_thread: std.Thread = try .spawn(.{}, serverThread, .{ init.io, allocator, log_server, &server_ready_sem, port });
 
     // Wait for the server to signal that it's ready before starting the client.
-    server_ready_sem.wait();
+    try server_ready_sem.wait(init.io);
     var client_thread: std.Thread = try .spawn(.{}, clientThread, .{ allocator, log_client, port });
 
     client_thread.join();

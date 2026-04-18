@@ -610,10 +610,20 @@ pub const Stream = struct {
         };
     }
 
+    /// File data for a zig file stream.
+    pub const FsFileData = struct {
+        /// The IO interface.
+        io: std.Io,
+        /// File to read.
+        file: std.Io.File,
+        /// File position to read/write.
+        position: u64 = 0,
+    };
+
     /// Initialize an SDL IO stream from a zig filesystem file.
     ///
     /// ## Function
-    /// * `file`: The file to initialize an SDL stream interface for.
+    /// * `file_data`: The file data to initialize an SDL stream interface for.
     ///
     /// ## Return Value
     /// Returns the stream.
@@ -621,52 +631,60 @@ pub const Stream = struct {
     /// ## Version
     /// This function is provided by zig-sdl3.
     pub fn initFromFsFile(
-        io: std.Io,
-        file: *std.Io.File,
+        file_data: *FsFileData,
     ) !Stream {
         const FsFileInterface = struct {
-            const UserData = struct { file: std.Io.File, io: std.Io };
+            const UserData = FsFileData;
 
             fn interface_close(user_data: ?*UserData) anyerror!void {
                 user_data.?.file.close(user_data.?.io);
             }
 
             fn interface_flush(user_data: ?*UserData) Error!void {
-                _ = user_data; // File does not need to flush?
+                user_data.?.file.sync(user_data.?.io) catch return error.Err;
             }
 
             fn interface_read(user_data: ?*UserData, buf: []u8) Error!?[]u8 {
-                const io_ = user_data.?.io;
-                const ret = user_data.?.file.read(io_, buf) catch |err| return switch (err) {
+                const ret = user_data.?.file.readPositionalAll(
+                    user_data.?.io,
+                    buf,
+                    user_data.?.position,
+                ) catch |err| return switch (err) {
                     error.NotOpenForReading => error.WriteOnly,
-                    error.SystemResources, error.ConnectionTimedOut => error.NotReady,
+                    error.SystemResources => error.NotReady,
                     else => error.Err,
                 };
                 if (ret == 0)
                     return null;
+                user_data.?.position += @intCast(ret);
                 return buf[0..ret];
             }
 
             fn interface_seek(user_data: ?*UserData, offset: isize, whence: Whence) anyerror!usize {
-                const io_ = user_data.?.io;
                 switch (whence) {
-                    .set => try user_data.?.file.seekTo(io_, @intCast(offset)),
-                    .cur => try user_data.?.file.seekBy(io_, @intCast(offset)),
-                    .end => try user_data.?.file.seekTo(io_, (try user_data.?.file.getEndPos(io)) - @as(u64, @intCast(offset))),
+                    .set => user_data.?.position = @intCast(offset),
+                    .cur => user_data.?.position = @intCast(@as(isize, @intCast(user_data.?.position)) + offset),
+                    .end => user_data.?.position = @as(u64, @intCast(try interface_size(user_data))) - @as(u64, @intCast(offset)),
                 }
-                return @intCast(try user_data.?.file.getPos());
+                return @intCast(user_data.?.position);
             }
 
             fn interface_size(user_data: ?*UserData) anyerror!usize {
-                return @intCast(try user_data.?.file.getEndPos(user_data.?.io));
+                return @intCast(try user_data.?.file.length(user_data.?.io));
             }
 
             fn interface_write(user_data: ?*UserData, data: []const u8) Error!usize {
-                return user_data.?.file.writeStreamingAll(user_data.?.io, data) catch |err| switch (err) {
+                const ret = user_data.?.file.writePositional(
+                    user_data.?.io,
+                    &.{data},
+                    user_data.?.position,
+                ) catch |err| return switch (err) {
                     error.NotOpenForWriting => error.ReadOnly,
                     error.DeviceBusy, error.SystemResources => error.NotReady,
                     else => error.Err,
                 };
+                user_data.?.position += @intCast(ret);
+                return ret;
             }
 
             const interface = Interface(UserData){
@@ -681,7 +699,7 @@ pub const Stream = struct {
         return init(
             FsFileInterface.UserData,
             FsFileInterface.interface,
-            file,
+            file_data,
         );
     }
 
@@ -2272,8 +2290,12 @@ test "Stream" {
         var tmp_dir = try std.Io.Dir.openDirAbsolute(io, "/tmp", .{});
         defer tmp_dir.close(io);
 
-        var tmp_file = try tmp_dir.createFile(io, "iostream_test", .{ .read = true });
-        const sdl_stream = try Stream.initFromFsFile(io, &tmp_file);
+        const tmp_file = try tmp_dir.createFile(io, "iostream_test", .{ .read = true });
+        var file_data = Stream.FsFileData{
+            .io = io,
+            .file = tmp_file,
+        };
+        const sdl_stream = try Stream.initFromFsFile(&file_data);
         try sdl_stream.writeU8(7);
         try sdl_stream.writeU8(3);
         try std.testing.expectEqual(0, sdl_stream.seek(0, .set));
