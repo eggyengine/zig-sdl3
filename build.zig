@@ -1,6 +1,5 @@
 const std = @import("std");
 const zig = @import("builtin");
-const zig_new_io = zig.zig_version.order(.{ .major = 0, .minor = 15, .patch = std.math.maxInt(usize) }) == .gt;
 
 const image = @import("build/image.zig");
 const net = @import("build/net.zig");
@@ -23,8 +22,8 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/sdl3.zig"),
         .version = .{
             .major = 0,
-            .minor = 1,
-            .patch = 9,
+            .minor = 2,
+            .patch = 0,
         },
     };
 
@@ -251,18 +250,13 @@ pub fn runExample(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: 
 
 pub fn setupExamples(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: ExampleOptions) !*std.Build.Step {
     const exp = b.step("examples", "Build all examples");
-    var dir = if (zig_new_io)
-        (try b.build_root.handle.openDir(b.graph.io, "examples", .{ .iterate = true }))
-    else blk: {
-        const examples_dir = b.path("examples");
-        break :blk (try std.fs.openDirAbsolute(examples_dir.getPath(b), .{ .iterate = true }));
-    };
-    defer if (zig_new_io) dir.close(b.graph.io) else dir.close();
-    var dir_iterator = try dir.walk(b.allocator);
+    var dir = try b.build_root.handle.openDir(b.graph.io, "examples", .{ .iterate = true });
+    defer dir.close(b.graph.io);
+    var dir_iterator = try dir.walkSelectively(b.allocator);
     defer dir_iterator.deinit();
-    while (try if (zig_new_io) dir_iterator.next(b.graph.io) else dir_iterator.next()) |file| {
-        if (file.kind == .file and std.mem.endsWith(u8, file.basename, ".zig")) {
-            const name = file.basename[0 .. file.basename.len - 4];
+    while (try dir_iterator.next(b.graph.io)) |file| {
+        const name = std.mem.cutSuffix(u8, file.basename, ".zig") orelse continue;
+        if (file.kind == .file) {
             var build_example = true;
             // TODO unhardcode if we will need more extension-specific examples
             if (std.mem.eql(u8, name, "net")) {

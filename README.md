@@ -11,6 +11,8 @@ A lightweight wrapper to zig-ify SDL3.
 >
 > See the [milestones](https://codeberg.org/7Games/zig-sdl3/milestones) for more details on progress.
 
+If something does not work, see the FAQ first.
+
 # Documentation
 https://7games.codeberg.page/zig-sdl3/@docs
 
@@ -27,7 +29,7 @@ The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
 ```sh
-zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.1.9
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.2.0
 ```
 * For in progress updates (nightly):
 ```sh
@@ -184,6 +186,9 @@ There is progress on the [shadercross](https://codeberg.org/7Games/zig-sdl3/src/
 ## HLSL Examples?
 
 There will be at least one that exists before 1.0.0 is released.
+
+## FreeType TLS Error
+You may need to run `zig fetch 'git+https://github.com/allyourcodebase/freetype#884fd2235e6ae1ec4306eda30b3259f20930ed2e'` due to a bug in zig if you encounter a TLS error.
 
 ## Symlink Error
 
