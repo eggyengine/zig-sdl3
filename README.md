@@ -45,6 +45,7 @@ const sdl3 = b.dependency("sdl3", .{
 
     // Lib options.
     /// .ext_image = false,
+    /// .ext_mixer = false,
     /// .ext_net = false,
     /// .ext_shadercross = false,
     /// .ext_shadercross_dxc = false,
@@ -75,6 +76,12 @@ const sdl3 = b.dependency("sdl3", .{
     // .image_enable_xcf = true,
     // .image_enable_xpm = true,
     // .image_enable_xv = true,
+    // 
+    // Options if `ext_mixer` is enabled:
+    // .mixer_shared = false,
+    // 
+    // Options if `ext_net` is enabled:
+    // .net_shared = false,
 });
 ```
 Now add the modules and artifact to your target as you would normally:

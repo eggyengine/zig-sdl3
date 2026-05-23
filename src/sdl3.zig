@@ -557,6 +557,11 @@ pub const message_box = @import("message_box.zig");
 /// Most macOS and iOS apps can use SDL without these functions, but this API they can be useful for specific OS-level integration tasks.
 pub const MetalView = @import("metal.zig").View;
 
+/// A library for audio mixing and playback through a simple, high-level API.
+/// It can load WAV, AIFF, AU, VOC, FLAC, MP3, Ogg Vorbis, and MIDI audio, depending on build options.
+/// If there are errors using this, you need to ensure `ext_mixer` is set to `true`.
+pub const mixer = @import("mixer.zig");
+
 /// Any GUI application has to deal with the mouse, and SDL provides functions to manage mouse input and the displayed cursor.
 ///
 /// Most interactions with the mouse will come through the event subsystem.
@@ -2125,6 +2130,7 @@ test {
         _ = @import("message_box.zig");
         _ = @import("metal.zig");
         _ = @import("misc.zig");
+        // _ = @import("mixer.zig");
         _ = @import("mouse.zig");
         _ = @import("mutex.zig");
         _ = @import("net.zig");

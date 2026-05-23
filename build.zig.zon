@@ -26,6 +26,11 @@
             .hash = "N-V-__8AAP6WIgI4b7FYvyJ6F7gg38lmxqvHSQPGyTlGuFuT",
             .lazy = true,
         },
+        .sdl_mixer = .{
+            .url = "git+https://github.com/libsdl-org/SDL_mixer?ref=release-3.2.2#a5e1890afc5115ffd16cefdbb4d50f74bf4970ce",
+            .hash = "N-V-__8AAMMc5wDZQWN_TTFvq3cfp6-AoyAKgTquzpi9upJc",
+            .lazy = true,
+        },
         .sdl_net = .{
             .url = "git+https://github.com/libsdl-org/SDL_net.git#8f5d9df8e42eb31e68aa3aed74ba2ab380e3001e",
             .hash = "N-V-__8AAK74BwCyuisw6wdXWDDg8sXuHJd_tPk1VKxLTUBK",
