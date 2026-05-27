@@ -9,7 +9,7 @@ fn sdlErrSdlMessageBox(
     err: ?[]const u8,
 ) void {
     var buf: [4096]u8 = undefined;
-    const err_msg = if (err) |val| std.fmt.bufPrintZ(&buf, "{s}", .{val}) catch "SDL message too long" else "Unknown SDL error";
+    const err_msg = if (err) |val| std.fmt.bufPrintSentinel(&buf, "{s}", .{val}, 0) catch "SDL message too long" else "Unknown SDL error";
     sdl3.message_box.showSimple(.{ .error_dialog = true }, "SDL Error", err_msg, null) catch {};
 }
 
@@ -44,7 +44,7 @@ fn sdlLogSdlMessageBox(
     } else "Unknown";
     var buf: [4096]u8 = undefined;
     const too_long = "SDL message too long";
-    const text = if (category_str) |val| std.fmt.bufPrintZ(&buf, "{s}: {s}", .{ val, message }) catch too_long else message;
+    const text = if (category_str) |val| std.fmt.bufPrintSentinel(&buf, "{s}: {s}", .{ val, message }, 0) catch too_long else message;
     sdl3.message_box.showSimple(
         .{
             .information_dialog = priority == .info,

@@ -7,10 +7,7 @@ const sdl3 = @import("sdl3.zig");
 const std = @import("std");
 
 comptime {
-    _ = @cImport({
-        @cDefine("SDL_MAIN_USE_CALLBACKS", {});
-        @cInclude("SDL3/SDL_main.h");
-    });
+    _ = @import("sdl_main");
 }
 
 const AppState = struct {

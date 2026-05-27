@@ -1,14 +1,13 @@
 const std = @import("std");
 const zig = @import("builtin");
 
+pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
 pub const image = @import("build/image.zig");
 pub const mixer = @import("build/mixer.zig");
 pub const net = @import("build/net.zig");
 pub const shadercross = @import("build/shadercross.zig");
 pub const shaders = @import("build/shaders.zig");
 pub const ttf = @import("build/ttf.zig");
-
-pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
 
 /// List of example programs to compile from the examples folder.
 const examples = [_][]const u8{
@@ -121,12 +120,28 @@ pub fn prepareSdl(
 
     const c_module = translate_c.createModule();
 
+    const main_c_source_code =
+        \\#define SDL_MAIN_USE_CALLBACKS
+        \\#include "SDL3/SDL_main.h"
+    ;
+    const main_c_source_file_step = b.addWriteFiles();
+    const main_c_source_path = main_c_source_file_step.add("main.c", main_c_source_code);
+    const translate_main_c = b.addTranslateC(.{
+        .root_source_file = main_c_source_path,
+        .target = target,
+        .optimize = optimize,
+    });
+    if (cfg.sdl_system_include_path) |val|
+        translate_main_c.addSystemIncludePath(val);
+    const main_c_module = translate_main_c.createModule();
+
     const sdl3 = if (public) b.addModule("sdl3", .{
         .root_source_file = b.path("src/sdl3.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "c", .module = c_module },
+            .{ .name = "sdl_main", .module = main_c_module },
         },
     }) else b.createModule(.{
         .root_source_file = b.path("src/sdl3.zig"),
@@ -134,6 +149,7 @@ pub fn prepareSdl(
         .optimize = optimize,
         .imports = &.{
             .{ .name = "c", .module = c_module },
+            .{ .name = "sdl_main", .module = main_c_module },
         },
     });
 
@@ -158,6 +174,7 @@ pub fn prepareSdl(
     if (cfg.system_sdl) {
         sdl3.linkSystemLibrary("sdl3", .{});
         translate_c.linkSystemLibrary("sdl3", .{});
+        translate_main_c.linkSystemLibrary("sdl3", .{});
     } else {
         if (b.lazyDependency("sdl", .{
             .target = target,
@@ -174,6 +191,7 @@ pub fn prepareSdl(
                 lib.root_module.addSystemIncludePath(val);
             b.installArtifact(lib);
             translate_c.addIncludePath(sdl_dep.path("include"));
+            translate_main_c.addIncludePath(sdl_dep.path("include"));
             sdl3.linkLibrary(lib);
             sdl_dep_lib = lib;
         }

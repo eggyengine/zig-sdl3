@@ -164,8 +164,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogMessage(
@@ -193,8 +194,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogCritical(
@@ -221,8 +223,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogDebug(
@@ -249,8 +252,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogError(
@@ -277,8 +281,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogInfo(
@@ -305,8 +310,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogTrace(
@@ -333,8 +339,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogVerbose(
@@ -361,8 +368,9 @@ pub const Category = enum(c_int) {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-        const allocator = fallback.get();
+        var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+        const allocator = fallback.allocator();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);
         c.SDL_LogWarn(
@@ -445,8 +453,9 @@ pub fn log(
     comptime fmt: []const u8,
     args: anytype,
 ) !void {
-    var fallback = std.heap.stackFallback(options.log_message_stack_size, sdl3.allocator);
-    const allocator = fallback.get();
+    var fallback_buf: [options.log_message_stack_size]u8 = undefined;
+    var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
+    const allocator = fallback.allocator();
     const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
     defer allocator.free(msg);
     c.SDL_Log(
