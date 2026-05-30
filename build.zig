@@ -73,22 +73,6 @@ pub fn build(b: *std.Build) !void {
         b.sysroot = val.getPath(b);
     }
 
-    const sdl_dep = b.dependency("sdl", .{
-        .target = target,
-        .optimize = optimize,
-        .preferred_linkage = c_sdl_preferred_linkage,
-        .strip = c_sdl_strip,
-        .sanitize_c = c_sdl_sanitize_c,
-        .lto = c_sdl_lto,
-        .emscripten_pthreads = c_sdl_emscripten_pthreads,
-        .install_build_config_h = c_sdl_install_build_config_h,
-    });
-
-    const sdl_dep_lib = sdl_dep.artifact("SDL3");
-    if (sdl_system_include_path) |val|
-        sdl_dep_lib.root_module.addSystemIncludePath(val);
-    b.installArtifact(sdl_dep_lib);
-
     // SDL options.
     const options = b.addOptions();
     const sdl3_main = b.option(bool, "main", "Enable SDL main") orelse false;
@@ -141,7 +125,6 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    translate_c.addIncludePath(sdl_dep.path("include"));
     if (sdl_system_include_path) |val|
         translate_c.addSystemIncludePath(val);
 
@@ -166,6 +149,23 @@ pub fn build(b: *std.Build) !void {
     };
 
     sdl3.addOptions("options", options);
+
+    const sdl_dep = b.dependency("sdl", .{
+        .target = target,
+        .optimize = optimize,
+        .preferred_linkage = c_sdl_preferred_linkage,
+        .strip = c_sdl_strip,
+        .sanitize_c = c_sdl_sanitize_c,
+        .lto = c_sdl_lto,
+        .emscripten_pthreads = c_sdl_emscripten_pthreads,
+        .install_build_config_h = c_sdl_install_build_config_h,
+    });
+
+    const sdl_dep_lib = sdl_dep.artifact("SDL3");
+    if (sdl_system_include_path) |val|
+        sdl_dep_lib.root_module.addSystemIncludePath(val);
+    b.installArtifact(sdl_dep_lib);
+    translate_c.addIncludePath(sdl_dep.path("include"));
     sdl3.linkLibrary(sdl_dep_lib);
 
     if (ext_image) {
