@@ -5,7 +5,7 @@ pub fn setup(
     b: *std.Build,
     sdl3: *std.Build.Module,
     translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: *std.Build.Step.Compile,
+    sdl_dep_lib: ?*std.Build.Step.Compile,
     linkage: std.builtin.LinkMode,
     cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
     system_include_path: ?std.Build.LazyPath,
@@ -26,7 +26,9 @@ pub fn setup(
     if (system_include_path) |val| {
         lib.root_module.addSystemIncludePath(val);
     }
-    lib.root_module.linkLibrary(sdl_dep_lib);
+    if (sdl_dep_lib) |sdl_lib| {
+        lib.root_module.linkLibrary(sdl_lib);
+    } else lib.root_module.linkSystemLibrary("sdl3", .{});
 
     // Use stb_image for loading JPEG and PNG files. Native alternatives such as
     // Windows Imaging Component and Apple's Image I/O framework are not yet

@@ -5,7 +5,7 @@ pub fn setup(
     b: *std.Build,
     sdl3: *std.Build.Module,
     translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: *std.Build.Step.Compile,
+    sdl_dep_lib: ?*std.Build.Step.Compile,
     linkage: std.builtin.LinkMode,
     cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
     system_include_path: ?std.Build.LazyPath,
@@ -54,7 +54,9 @@ pub fn setup(
     });
     lib.root_module.linkLibrary(freetype_dep.artifact("freetype"));
 
-    lib.root_module.linkLibrary(sdl_dep_lib);
+    if (sdl_dep_lib) |sdl_lib| {
+        lib.root_module.linkLibrary(sdl_lib);
+    } else lib.root_module.linkSystemLibrary("sdl3", .{});
     lib.installHeadersDirectory(upstream.path("include"), "", .{});
 
     b.installArtifact(lib);
