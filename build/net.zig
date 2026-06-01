@@ -4,7 +4,7 @@ pub fn setup(
     b: *std.Build,
     sdl3: *std.Build.Module,
     translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: *std.Build.Step.Compile,
+    sdl_dep_lib: ?*std.Build.Step.Compile,
     linkage: std.builtin.LinkMode,
     cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
     system_include_path: ?std.Build.LazyPath,
@@ -57,7 +57,9 @@ pub fn setup(
     if (native_os != .windows and native_os != .haiku) {
         lib.root_module.addCMacro("_DEFAULT_SOURCE", "");
     }
-    lib.root_module.linkLibrary(sdl_dep_lib);
+    if (sdl_dep_lib) |sdl_lib| {
+        lib.root_module.linkLibrary(sdl_lib);
+    } else lib.root_module.linkSystemLibrary("sdl3", .{});
     // Linking.
     if (native_os == .windows) {
         lib.root_module.linkSystemLibrary("iphlpapi", .{});

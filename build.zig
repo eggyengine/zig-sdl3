@@ -73,21 +73,7 @@ pub fn build(b: *std.Build) !void {
         b.sysroot = val.getPath(b);
     }
 
-    const sdl_dep = b.dependency("sdl", .{
-        .target = target,
-        .optimize = optimize,
-        .preferred_linkage = c_sdl_preferred_linkage,
-        .strip = c_sdl_strip,
-        .sanitize_c = c_sdl_sanitize_c,
-        .lto = c_sdl_lto,
-        .emscripten_pthreads = c_sdl_emscripten_pthreads,
-        .install_build_config_h = c_sdl_install_build_config_h,
-    });
-
-    const sdl_dep_lib = sdl_dep.artifact("SDL3");
-    if (sdl_system_include_path) |val|
-        sdl_dep_lib.root_module.addSystemIncludePath(val);
-    b.installArtifact(sdl_dep_lib);
+    const system_sdl = b.systemIntegrationOption("sdl", .{});
 
     // SDL options.
     const options = b.addOptions();
@@ -141,7 +127,6 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    translate_c.addIncludePath(sdl_dep.path("include"));
     if (sdl_system_include_path) |val|
         translate_c.addSystemIncludePath(val);
 
@@ -166,29 +151,55 @@ pub fn build(b: *std.Build) !void {
     };
 
     sdl3.addOptions("options", options);
-    sdl3.linkLibrary(sdl_dep_lib);
+
+    var sdl_dep_lib: ?*std.Build.Step.Compile = null;
+    if (system_sdl) {
+        sdl3.linkSystemLibrary("sdl3", .{});
+        translate_c.linkSystemLibrary("sdl3", .{});
+    } else {
+        if (b.lazyDependency("sdl", .{
+            .target = target,
+            .optimize = optimize,
+            .preferred_linkage = c_sdl_preferred_linkage,
+            .strip = c_sdl_strip,
+            .sanitize_c = c_sdl_sanitize_c,
+            .lto = c_sdl_lto,
+            .emscripten_pthreads = c_sdl_emscripten_pthreads,
+            .install_build_config_h = c_sdl_install_build_config_h,
+        })) |sdl_dep| {
+            const lib = sdl_dep.artifact("SDL3");
+            if (sdl_system_include_path) |val|
+                lib.root_module.addSystemIncludePath(val);
+            b.installArtifact(lib);
+            translate_c.addIncludePath(sdl_dep.path("include"));
+            sdl3.linkLibrary(lib);
+            sdl_dep_lib = lib;
+        }
+    }
+
+    const ext_linkage = if (system_sdl) .dynamic else c_sdl_preferred_linkage;
 
     if (ext_image) {
-        image.setup(b, sdl3, translate_c, sdl_dep_lib, c_sdl_preferred_linkage, .{
+        image.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
             .optimize = optimize,
             .target = target,
         }, sdl_system_include_path);
     }
     if (ext_net) {
-        net.setup(b, sdl3, translate_c, sdl_dep_lib, c_sdl_preferred_linkage, .{
+        net.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
             .optimize = optimize,
             .target = target,
         }, sdl_system_include_path);
     }
     if (ext_ttf) {
-        ttf.setup(b, sdl3, translate_c, sdl_dep_lib, c_sdl_preferred_linkage, .{
+        ttf.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
             .optimize = optimize,
             .target = target,
         }, sdl_system_include_path);
     }
 
     _ = setupDocs(b, sdl3);
-    _ = setupTest(b, cfg, options, c_module);
+    _ = setupTest(b, cfg, options, c_module, system_sdl);
 
     _ = try setupExamples(b, sdl3, cfg, example_options);
     _ = try runExample(b, sdl3, cfg, example_options);
@@ -275,7 +286,7 @@ pub fn setupExamples(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, option
     return exp;
 }
 
-pub fn setupTest(b: *std.Build, cfg: Config, options: *std.Build.Step.Options, c_module: *std.Build.Module) *std.Build.Step.Compile {
+pub fn setupTest(b: *std.Build, cfg: Config, options: *std.Build.Step.Options, c_module: *std.Build.Module, system_sdl: bool) *std.Build.Step.Compile {
     const test_module = b.createModule(.{
         .root_source_file = cfg.root_source_file,
         .target = cfg.target,
@@ -289,12 +300,15 @@ pub fn setupTest(b: *std.Build, cfg: Config, options: *std.Build.Step.Options, c
         .root_module = test_module,
     });
     tst.root_module.addOptions("options", options);
-    const sdl_dep = b.dependency("sdl", .{
+    if (system_sdl) {
+        tst.root_module.linkSystemLibrary("sdl3", .{});
+    } else if (b.lazyDependency("sdl", .{
         .target = cfg.target,
         .optimize = cfg.optimize,
-    });
-    const sdl_dep_lib = sdl_dep.artifact("SDL3");
-    tst.root_module.linkLibrary(sdl_dep_lib);
+    })) |sdl_dep| {
+        const sdl_dep_lib = sdl_dep.artifact("SDL3");
+        tst.root_module.linkLibrary(sdl_dep_lib);
+    }
     const tst_run = b.addRunArtifact(tst);
     const tst_step = b.step("test", "Run all tests");
     tst_step.dependOn(&tst_run.step);

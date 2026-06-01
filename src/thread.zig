@@ -39,11 +39,11 @@ pub const Priority = enum(c.SDL_ThreadPriority) {
 /// This enum is available since SDL 3.2.0.
 pub const State = enum(c.SDL_ThreadState) {
     /// The thread is currently running.
-    alive,
+    alive = c.SDL_THREAD_ALIVE,
     /// The thread is detached and can't be waited on.
-    detached,
+    detached = c.SDL_THREAD_DETACHED,
     /// The thread has finished and should be cleaned up with `thread.Thread.wait()`.
-    complete,
+    complete = c.SDL_THREAD_COMPLETE,
 
     /// From and SDL value.
     pub fn fromSdl(value: c.SDL_ThreadState) ?State {
