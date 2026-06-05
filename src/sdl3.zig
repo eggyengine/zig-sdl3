@@ -718,6 +718,9 @@ pub const Scancode = @import("scancode.zig").Scancode;
 /// This causes SDL to scan the system for sensors, and load appropriate drivers.
 pub const sensor = @import("sensor.zig");
 
+/// Extension library for cross-compiling shaders at runtime.
+pub const shadercross = @import("shadercross.zig");
+
 /// The storage API is a high-level API designed to abstract away the portability issues that come up when using something lower-level.
 ///
 /// See https://wiki.libsdl.org/SDL3/CategoryStorage for more details.
@@ -2125,6 +2128,7 @@ test {
         _ = @import("render.zig");
         _ = @import("scancode.zig");
         _ = @import("sensor.zig");
+        // _ = @import("shadercross.zig");
         _ = @import("storage.zig");
         _ = @import("surface.zig");
         _ = @import("system.zig");

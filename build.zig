@@ -1,9 +1,10 @@
 const std = @import("std");
 const zig = @import("builtin");
 
-const image = @import("build/image.zig");
-const net = @import("build/net.zig");
-const ttf = @import("build/ttf.zig");
+pub const image = @import("build/image.zig");
+pub const net = @import("build/net.zig");
+pub const shadercross = @import("build/shadercross.zig");
+pub const ttf = @import("build/ttf.zig");
 
 const ExampleOptions = struct {
     ext_image: bool,
@@ -101,6 +102,8 @@ pub fn build(b: *std.Build) !void {
     // SDL extension options.
     const ext_image = b.option(bool, "ext_image", "Enable SDL_image extension") orelse false;
     const ext_net = b.option(bool, "ext_net", "Enable SDL_net extension") orelse false;
+    const ext_shadercross = b.option(bool, "ext_shadercross", "Enable SDL_shadercross extension") orelse false;
+    const ext_shadercross_dxc = b.option(bool, "ext_shadercross_dxc", "Enable SDL_shadercross extension DXC support") orelse false;
     const ext_ttf = b.option(bool, "ext_ttf", "Enable SDL_ttf extension") orelse false;
 
     const c_source_code = b.fmt(
@@ -112,10 +115,12 @@ pub fn build(b: *std.Build) !void {
         \\{s}
         \\{s}
         \\{s}
+        \\{s}
     , .{
         if (!sdl3_main) "#define SDL_MAIN_NOIMPL\n" else "",
         if (ext_image) "#include <SDL3_image/SDL_image.h>\n" else "",
         if (ext_net) "#include <SDL3_net/SDL_net.h>\n" else "",
+        if (ext_shadercross) "#include <SDL3_shadercross/SDL_shadercross.h>\n" else "",
         if (ext_ttf) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
     });
 
@@ -191,6 +196,12 @@ pub fn build(b: *std.Build) !void {
             .target = target,
         }, sdl_system_include_path);
     }
+    if (ext_shadercross) {
+        shadercross.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
+            .optimize = optimize,
+            .target = target,
+        }, sdl_system_include_path, ext_shadercross_dxc);
+    }
     if (ext_ttf) {
         ttf.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
             .optimize = optimize,
@@ -220,7 +231,12 @@ pub fn setupDocs(b: *std.Build, sdl3: *std.Build.Module) *std.Build.Step {
     return docs_step;
 }
 
-pub fn setupExample(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, name: []const u8) !*std.Build.Step.Compile {
+pub fn setupExample(
+    b: *std.Build,
+    sdl3: *std.Build.Module,
+    cfg: Config,
+    name: []const u8,
+) !*std.Build.Step.Compile {
     const exe_module = b.createModule(.{
         .root_source_file = b.path(try std.fmt.allocPrint(b.allocator, "examples/{s}.zig", .{name})),
         .target = cfg.target,
@@ -259,7 +275,12 @@ pub fn runExample(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: 
     }
 }
 
-pub fn setupExamples(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: ExampleOptions) !*std.Build.Step {
+pub fn setupExamples(
+    b: *std.Build,
+    sdl3: *std.Build.Module,
+    cfg: Config,
+    options: ExampleOptions,
+) !*std.Build.Step {
     const exp = b.step("examples", "Build all examples");
     var dir = try b.build_root.handle.openDir(b.graph.io, "examples", .{ .iterate = true });
     defer dir.close(b.graph.io);
@@ -286,7 +307,13 @@ pub fn setupExamples(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, option
     return exp;
 }
 
-pub fn setupTest(b: *std.Build, cfg: Config, options: *std.Build.Step.Options, c_module: *std.Build.Module, system_sdl: bool) *std.Build.Step.Compile {
+pub fn setupTest(
+    b: *std.Build,
+    cfg: Config,
+    options: *std.Build.Step.Options,
+    c_module: *std.Build.Module,
+    system_sdl: bool,
+) *std.Build.Step.Compile {
     const test_module = b.createModule(.{
         .root_source_file = cfg.root_source_file,
         .target = cfg.target,
