@@ -47,7 +47,7 @@ pub const MainCallback = *const fn (
 pub fn enterAppMainCallbacks(
     args: [:null]?[*:0]u8,
     comptime UserData: type,
-    comptime app_init: ?sdl3.AppInitCallback(UserData),
+    comptime app_init: sdl3.AppInitCallback(UserData),
     comptime app_iterate: ?sdl3.AppIterateCallback(UserData),
     comptime app_event: ?sdl3.AppEventCallback(UserData),
     comptime app_quit: ?sdl3.AppQuitCallback(UserData),
@@ -66,23 +66,18 @@ pub fn enterAppMainCallbacks(
                 return c.SDL_APP_FAILURE;
             };
             app_state.init = main_init;
-            if (app_init) |cb| {
-                const ret_user_data, const ret = cb(main_init.*) catch |err| {
-                    std.log.err("{s}", .{@errorName(err)});
-                    if (@errorReturnTrace()) |trace| {
-                        std.debug.dumpErrorReturnTrace(trace);
-                    }
-                    main_init.deinit(std.heap.c_allocator);
-                    std.heap.c_allocator.destroy(app_state);
-                    return c.SDL_APP_FAILURE;
-                };
-                app_state.user_data = ret_user_data;
-                app_state_c.* = app_state;
-                return @intFromEnum(ret);
-            }
-            main_init.deinit(std.heap.c_allocator);
-            std.heap.c_allocator.destroy(app_state);
-            return c.SDL_APP_CONTINUE;
+            const ret_user_data, const ret = app_init(main_init.*) catch |err| {
+                std.log.err("{s}", .{@errorName(err)});
+                if (@errorReturnTrace()) |trace| {
+                    std.debug.dumpErrorReturnTrace(trace);
+                }
+                main_init.deinit(std.heap.c_allocator);
+                std.heap.c_allocator.destroy(app_state);
+                return c.SDL_APP_FAILURE;
+            };
+            app_state.user_data = ret_user_data;
+            app_state_c.* = app_state;
+            return @intFromEnum(ret);
         }
         pub fn iterate(app_state_c: ?*anyopaque) callconv(.c) c_uint {
             const app_state: *AppState = @ptrCast(@alignCast(app_state_c orelse return c.SDL_APP_FAILURE));
