@@ -61,7 +61,7 @@ pub fn init(
     // SDL3 setup.
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
-    sdl3.log.setLogOutputFunction(void, &sdl3.extras.sdlLogZigLog, null);
+    sdl3.log.setLogOutputFunction(void, &sdl3.extras.loggers.zigLog, null);
 
     // Get our GPU device that supports SPIR-V.
     const shader_formats = sdl3.shadercross.getSpirvShaderFormats() orelse @panic("No formats available");
