@@ -19,7 +19,6 @@ fn init(
     app_state: *AppState,
     init_data: sdl3.extras.Init,
 ) !sdl3.AppResult {
-    errdefer sdl3.shutdown();
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
 

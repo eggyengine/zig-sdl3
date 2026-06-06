@@ -26,7 +26,6 @@ pub fn init(
 ) !sdl3.AppResult {
     _ = init_data;
 
-    errdefer sdl3.shutdown();
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
 
