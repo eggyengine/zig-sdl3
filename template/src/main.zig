@@ -53,7 +53,7 @@ pub fn init(
 
     // Setup logging.
     sdl3.log.setAllPriorities(.info);
-    sdl3.log.setLogOutputFunction(void, &sdl3.extras.sdlLogZigLog, null);
+    sdl3.log.setLogOutputFunction(void, &sdl3.extras.loggers.zigLog, null);
 
     try log_app.logInfo("Starting application...", .{});
 
