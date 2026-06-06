@@ -2,6 +2,7 @@ const c = @import("c");
 const events = @import("events.zig");
 const extras = @import("extras.zig");
 const root = @import("root");
+const sdl3 = @import("sdl3.zig");
 const std = @import("std");
 
 comptime {
@@ -12,12 +13,12 @@ comptime {
 }
 
 const AppState = struct {
-    init: *extras.Init,
+    init: *sdl3.Init,
     user_data: *anyopaque,
 };
 
 fn getAppStateType() type {
-    return @typeInfo(@typeInfo(@TypeOf(root.init)).@"fn".params[0].type.?).pointer.child;
+    return @typeInfo(@typeInfo(@typeInfo(@TypeOf(root.init)).@"fn".return_type.?).error_union.payload).@"struct".fields[0].type;
 }
 
 /// This will be called once before anything else.
@@ -75,14 +76,14 @@ pub export fn SDL_AppInit(
         return c.SDL_APP_FAILURE;
     };
     state.user_data = user_data;
-    const init = extras.Init.init(std.heap.c_allocator, arg_values[0..@intCast(arg_count)]) catch {
+    const init = sdl3.Init.init(std.heap.c_allocator, arg_values[0..@intCast(arg_count)]) catch {
         std.heap.c_allocator.destroy(user_data);
         std.heap.c_allocator.destroy(state);
         return c.SDL_APP_FAILURE;
     };
     state.init = init;
     if (@hasDecl(root, "init")) {
-        const ret = root.init(user_data, init.*) catch |err| {
+        const ret_user_data, const ret = root.init(init.*) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
                 std.debug.dumpErrorReturnTrace(trace);
@@ -92,10 +93,13 @@ pub export fn SDL_AppInit(
             std.heap.c_allocator.destroy(state);
             return c.SDL_APP_FAILURE;
         };
+        @as(*getAppStateType(), @ptrCast(@alignCast(state.user_data))).* = ret_user_data;
         app_state.* = state;
         return @intFromEnum(ret);
     } else {
-        app_state.* = state;
+        init.deinit(std.heap.c_allocator);
+        std.heap.c_allocator.destroy(user_data);
+        std.heap.c_allocator.destroy(state);
         return c.SDL_APP_CONTINUE;
     }
 }
