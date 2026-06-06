@@ -859,7 +859,7 @@ pub const AppResult = enum(c.SDL_AppResult) {
 /// Function pointer for event callback.
 ///
 /// ## Function Parameters
-/// * `app_state`: An optional pointer, provided by the app in `SDL_AppInit()`.
+/// * `app_state`: User data, initialized by the app in `SDL_AppInit()`.
 /// * `event`: The new event for the app to examine.
 ///
 /// ## Return Value
@@ -884,8 +884,8 @@ pub fn AppEventCallback(
 /// Function pointer typedef for init.
 ///
 /// ## Function Parameters
-/// * `app_state`: A place where the app can optionally store a pointer for future use.
-/// * `args`: Command line arguments for the app.
+/// * `app_state`: A place where the app can store data for future use.
+/// * `init`: Initialization struct similar to zig's juicy main.
 ///
 /// ## Return Value
 /// Returns `AppResult.failure` to terminate with an error, `AppResult.success` to terminate with success, `AppResult.run` to continue.
@@ -901,15 +901,15 @@ pub fn AppInitCallback(
     comptime UserData: type,
 ) type {
     return *const fn (
-        app_state: *?*UserData,
-        args: [][*:0]u8,
+        app_state: *UserData,
+        init: extras.Init,
     ) anyerror!AppResult;
 }
 
 /// Function pointer typedef for an update loop.
 ///
 /// ## Function Parameters
-/// * `app_state`: An optional pointer, provided by the app in `SDL_AppInit()`.
+/// * `app_state`: User data, initialized by the app in `SDL_AppInit()`.
 ///
 /// ## Return Value
 /// Returns `AppResult.failure` to terminate with an error, `AppResult.success` to terminate with success, `AppResult.run` to continue.
@@ -930,7 +930,7 @@ pub fn AppIterateCallback(comptime UserData: type) type {
 /// Function pointer typedef for quitting.
 ///
 /// ## Function Parameters
-/// * `app_state`: An optional pointer, provided by the app in `SDL_AppInit()`.
+/// * `app_state`: User data, initialized by the app in `SDL_AppInit()`. This will be `null` if the init function never finished successfully.
 /// * `result`: The result code that terminated the app (success or failure).
 ///
 /// ## Remarks
@@ -943,7 +943,10 @@ pub fn AppIterateCallback(comptime UserData: type) type {
 pub fn AppQuitCallback(
     comptime UserData: type,
 ) type {
-    return *const fn (app_state: ?*UserData, result: AppResult) void;
+    return *const fn (
+        app_state: ?*UserData,
+        result: AppResult,
+    ) void;
 }
 
 /// Callback run on the main thread.

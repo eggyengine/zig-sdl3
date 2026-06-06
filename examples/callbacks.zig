@@ -1,8 +1,6 @@
 const sdl3 = @import("sdl3");
 const std = @import("std");
 
-const allocator = std.heap.smp_allocator;
-
 const fps = 60;
 const screen_width = 640;
 const screen_height = 480;
@@ -23,10 +21,12 @@ const AppState = struct {
 
 /// Runs once on application startup.
 pub fn init(
-    app_state: *?*AppState,
-    args: [][*:0]u8,
+    app_state: *AppState,
+    init_data: sdl3.extras.Init,
 ) !sdl3.AppResult {
-    _ = args;
+    _ = init_data;
+
+    errdefer sdl3.shutdown();
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
 
@@ -36,12 +36,10 @@ pub fn init(
     errdefer window.deinit();
 
     // Finally create the application state.
-    const state = try allocator.create(AppState);
-    state.* = .{
+    app_state.* = .{
         .fps_capper = .{ .mode = .{ .limited = fps } },
         .window = window,
     };
-    app_state.* = state;
     return .run;
 }
 
@@ -86,7 +84,6 @@ pub fn quit(
     // We only want to de-initialize if initialization was successful.
     if (app_state) |state| {
         state.window.deinit();
-        allocator.destroy(state);
     }
     sdl3.quit(init_flags);
     sdl3.shutdown();

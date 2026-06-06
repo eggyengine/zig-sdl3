@@ -13,13 +13,11 @@ const my_image = @embedFile("data/trees.jpeg");
 const fps = 60;
 const window_width = 640;
 const window_height = 480;
+const init_flags = sdl3.InitFlags{ .video = true };
 
 // Disable main hack.
 pub const _start = void;
 pub const WinMainCRTStartup = void;
-
-/// Allocator we will use.
-const allocator = if (builtin.os.tag != .emscripten) std.heap.smp_allocator else std.heap.c_allocator;
 
 /// For logging system messages.
 const log_app = sdl3.log.Category.application;
@@ -36,7 +34,7 @@ const AppState = struct {
 ///
 /// ## Function Parameters
 /// * `app_state`: Where to store a pointer representing the state to use for the application.
-/// * `args`: Slice of arguments provided to the application.
+/// * `init_data`: Initialization data provided to the application.
 ///
 /// ## Return Value
 /// Returns if the app should continue running, or result in success or failure.
@@ -47,20 +45,20 @@ const AppState = struct {
 /// Do not worry about logging errors from SDL yourself and just use `try` and `catch` as you please.
 /// If you set the error callback for every thread, then zig-sdl3 will be automatically logging errors.
 pub fn init(
-    app_state: *?*AppState,
-    args: [][*:0]u8,
+    app_state: *AppState,
+    init_data: sdl3.extras.Init,
 ) !sdl3.AppResult {
-    _ = args;
+    _ = init_data;
+
+    errdefer sdl3.shutdown();
+    try sdl3.init(init_flags);
+    errdefer sdl3.quit(init_flags);
 
     // Setup logging.
     sdl3.log.setAllPriorities(.info);
     sdl3.log.setLogOutputFunction(void, &sdl3.extras.sdlLogZigLog, null);
 
     try log_app.logInfo("Starting application...", .{});
-
-    // Prepare app state.
-    const state = try allocator.create(AppState);
-    errdefer allocator.destroy(state);
 
     // Setup initial data.
     const window, const renderer = try sdl3.render.Renderer.initWithWindow(
@@ -89,13 +87,12 @@ pub fn init(
     _ = dummy;
 
     // Set app state.
-    state.* = .{
+    app_state.* = .{
         .frame_capper = frame_capper,
         .window = window,
         .renderer = renderer,
         .tree_tex = tree_tex,
     };
-    app_state.* = state;
 
     try log_app.logInfo("Finished initializing", .{});
     return .run;
@@ -185,6 +182,8 @@ pub fn quit(
         val.tree_tex.deinit();
         val.renderer.deinit();
         val.window.deinit();
-        allocator.destroy(val);
     }
+
+    sdl3.quit(init_flags);
+    sdl3.shutdown();
 }
