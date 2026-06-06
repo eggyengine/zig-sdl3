@@ -1,5 +1,6 @@
 const c = @import("c");
 const events = @import("events.zig");
+const extras = @import("extras.zig");
 const root = @import("root");
 const std = @import("std");
 
@@ -8,6 +9,15 @@ comptime {
         @cDefine("SDL_MAIN_USE_CALLBACKS", {});
         @cInclude("SDL3/SDL_main.h");
     });
+}
+
+const AppState = struct {
+    init: *extras.Init,
+    user_data: *anyopaque,
+};
+
+fn getAppStateType() type {
+    return @typeInfo(@typeInfo(@TypeOf(root.init)).@"fn".params[0].type.?).pointer.child;
 }
 
 /// This will be called once before anything else.
@@ -41,10 +51,7 @@ comptime {
 ///
 /// This function should not go into an infinite mainloop; it should do any one-time setup it requires and then return.
 ///
-/// The app may optionally assign a pointer to `app_state`.
-/// This pointer will be provided on every future call to the other entry points,
-/// to allow application state to be preserved between functions without the app needing to use a global variable.
-/// If this isn't set, the pointer will be `null` in future entry points.
+/// The app can also write user data to `app_state`, it will be `null` on quit if this function does not succeed.
 ///
 /// If this function returns `sdl3.AppResult.run`, the app will proceed to normal operation,
 /// and will begin receiving repeated calls to `SDL_AppIterate()` and `SDL_AppEvent()` for the life of the program.
@@ -61,16 +68,36 @@ pub export fn SDL_AppInit(
     arg_count: c_int,
     arg_values: [*][*:0]u8,
 ) callconv(.c) c.SDL_AppResult {
+    app_state.* = null;
+    const state = std.heap.c_allocator.create(AppState) catch return c.SDL_APP_FAILURE;
+    const user_data = std.heap.c_allocator.create(getAppStateType()) catch {
+        std.heap.c_allocator.destroy(state);
+        return c.SDL_APP_FAILURE;
+    };
+    state.user_data = user_data;
+    const init = extras.Init.init(std.heap.c_allocator, arg_values[0..@intCast(arg_count)]) catch {
+        std.heap.c_allocator.destroy(user_data);
+        std.heap.c_allocator.destroy(state);
+        return c.SDL_APP_FAILURE;
+    };
+    state.init = init;
     if (@hasDecl(root, "init")) {
-        const ret = root.init(@ptrCast(@alignCast(app_state)), arg_values[0..@intCast(arg_count)]) catch |err| {
+        const ret = root.init(user_data, init.*) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
                 std.debug.dumpErrorReturnTrace(trace);
             }
+            init.deinit(std.heap.c_allocator);
+            std.heap.c_allocator.destroy(user_data);
+            std.heap.c_allocator.destroy(state);
             return c.SDL_APP_FAILURE;
         };
+        app_state.* = state;
         return @intFromEnum(ret);
-    } else return c.SDL_APP_CONTINUE;
+    } else {
+        app_state.* = state;
+        return c.SDL_APP_CONTINUE;
+    }
 }
 
 /// This is called over and over, possibly at the refresh rate of the display or some other metric that the platform dictates.
@@ -126,8 +153,9 @@ pub export fn SDL_AppInit(
 pub export fn SDL_AppIterate(
     app_state: ?*anyopaque,
 ) c.SDL_AppResult {
+    const state: *AppState = @ptrCast(@alignCast(app_state orelse return c.SDL_APP_FAILURE));
     if (@hasDecl(root, "iterate")) {
-        const ret = root.iterate(@ptrCast(@alignCast(app_state))) catch |err| {
+        const ret = root.iterate(@ptrCast(@alignCast(state.user_data))) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
                 std.debug.dumpErrorReturnTrace(trace);
@@ -184,7 +212,8 @@ pub export fn SDL_AppEvent(
     event: *c.SDL_Event,
 ) callconv(.c) c.SDL_AppResult {
     if (@hasDecl(root, "event")) {
-        const ret = root.event(@ptrCast(@alignCast(app_state)), events.Event.fromSdl(event.*)) catch |err| {
+        const state: *AppState = @ptrCast(@alignCast(app_state orelse return c.SDL_APP_FAILURE));
+        const ret = root.event(@ptrCast(@alignCast(state.user_data)), events.Event.fromSdl(event.*)) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             if (@errorReturnTrace()) |trace| {
                 std.debug.dumpErrorReturnTrace(trace);
@@ -237,8 +266,14 @@ pub export fn SDL_AppQuit(
     app_state: ?*anyopaque,
     result: c.SDL_AppResult,
 ) callconv(.c) void {
+    const state: ?*AppState = if (app_state) |val| @ptrCast(@alignCast(val)) else null;
     if (@hasDecl(root, "quit")) {
-        root.quit(@ptrCast(@alignCast(app_state)), @enumFromInt(result));
+        root.quit(if (state) |val| @ptrCast(@alignCast(val.user_data)) else null, @enumFromInt(result));
+    }
+    if (state) |val| {
+        std.heap.c_allocator.destroy(@as(*getAppStateType(), @ptrCast(@alignCast(val.user_data))));
+        val.init.deinit(std.heap.c_allocator);
+        std.heap.c_allocator.destroy(val);
     }
 }
 

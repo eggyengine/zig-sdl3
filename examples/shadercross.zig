@@ -11,9 +11,6 @@ const gpu_debug = @import("builtin").mode == .Debug;
 pub const _start = void;
 pub const WinMainCRTStartup = void;
 
-/// Allocator we will use.
-const allocator = std.heap.smp_allocator;
-
 const init_flags = sdl3.InitFlags{ .video = true };
 
 const vert_shader_source = @embedFile("shaders/rawTriangle.vert.spv");
@@ -57,10 +54,10 @@ fn loadGraphicsShader(
 }
 
 pub fn init(
-    app_state: *?*AppState,
-    args: [][*:0]u8,
+    app_state: *AppState,
+    init_data: sdl3.extras.Init,
 ) !sdl3.AppResult {
-    _ = args;
+    _ = init_data;
 
     // SDL3 setup.
     try sdl3.init(init_flags);
@@ -100,23 +97,23 @@ pub fn init(
     errdefer device.releaseGraphicsPipeline(line_pipeline);
 
     // Prepare app state.
-    const state = try allocator.create(AppState);
-    errdefer allocator.destroy(state);
-    state.* = .{
+    app_state.* = .{
         .device = device,
         .window = window,
         .line_pipeline = line_pipeline,
         .fill_pipeline = fill_pipeline,
+        .use_scissor_rect = false,
+        .use_small_viewport = false,
+        .use_wireframe_mode = false,
     };
 
     // Finish setup.
-    app_state.* = state;
     try sdl3.log.log("Press left to toggle wireframe", .{});
     try sdl3.log.log("Press down to toggle small viewport", .{});
     try sdl3.log.log("Press right to toggle scissor rect", .{});
     try sdl3.log.log(
         "State: {{Wireframe: {any}, SmallViewport: {any}, ScissorRect: {any}}}",
-        .{ state.use_wireframe_mode, state.use_small_viewport, state.use_scissor_rect },
+        .{ app_state.use_wireframe_mode, app_state.use_small_viewport, app_state.use_scissor_rect },
     );
     return .run;
 }
@@ -202,7 +199,6 @@ pub fn quit(
         val.device.releaseWindow(val.window);
         val.window.deinit();
         val.device.deinit();
-        allocator.destroy(val);
     }
     sdl3.quit(init_flags);
     sdl3.shutdown();

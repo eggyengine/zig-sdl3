@@ -4,6 +4,15 @@ const options = @import("options");
 const std = @import("std");
 const timer = @import("timer.zig");
 
+/// Initialization data that can be used for callbacks.
+///
+/// ## Remarks
+/// Arguments and environment are not provided as the init function contains the arguments, and SDL provides a mechanism for interacting with environment variables.
+///
+/// ## Version
+/// This struct is provided by zig-sdl3.
+pub const Init = @import("extras/Init.zig");
+
 /// Capper for keeping the framerate within a given range.
 ///
 /// ## Remarks

@@ -1,8 +1,6 @@
 const sdl3 = @import("sdl3");
 const std = @import("std");
 
-const allocator = std.heap.smp_allocator;
-
 const fps = 60;
 const screen_width = 640;
 const screen_height = 480;
@@ -12,28 +10,30 @@ const init_flags = sdl3.InitFlags{ .video = true };
 const AppState = struct {
     fps_capper: sdl3.extras.FramerateCapper(f32),
     window: sdl3.video.Window,
+    init: sdl3.extras.Init,
+    heap_value: *i32,
 };
 
 /// Runs once on application startup.
 fn init(
-    app_state: *?*AppState,
-    args: [][*:0]u8,
+    app_state: *AppState,
+    init_data: sdl3.extras.Init,
 ) !sdl3.AppResult {
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
 
     // Create window.
     // We use `errdefer` as we will only free items from the app with a created app state.
-    const window = try sdl3.video.Window.init(std.mem.span(args[0]), screen_width, screen_height, .{});
+    const window = try sdl3.video.Window.init(std.mem.span(init_data.args[0]), screen_width, screen_height, .{});
     errdefer window.deinit();
 
     // Finally create the application state.
-    const state = try allocator.create(AppState);
-    state.* = .{
+    app_state.* = .{
         .fps_capper = .{ .mode = .{ .limited = fps } },
         .window = window,
+        .init = init_data,
+        .heap_value = try init_data.gpa.create(i32), // Init data comes with an allocator.
     };
-    app_state.* = state;
     return .run;
 }
 
@@ -77,8 +77,8 @@ fn quit(
 
     // We only want to de-initialize if initialization was successful.
     if (app_state) |state| {
+        state.init.gpa.destroy(state.heap_value);
         state.window.deinit();
-        allocator.destroy(state);
     }
     sdl3.quit(init_flags);
     sdl3.shutdown();

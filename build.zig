@@ -9,6 +9,7 @@ pub const ttf = @import("build/ttf.zig");
 const ExampleOptions = struct {
     ext_image: bool,
     ext_net: bool,
+    ext_shadercross: bool,
     ext_ttf: bool,
 };
 
@@ -24,7 +25,7 @@ pub fn build(b: *std.Build) !void {
         .version = .{
             .major = 0,
             .minor = 2,
-            .patch = 0,
+            .patch = 1,
         },
     };
 
@@ -152,6 +153,7 @@ pub fn build(b: *std.Build) !void {
     const example_options = ExampleOptions{
         .ext_image = ext_image,
         .ext_net = ext_net,
+        .ext_shadercross = ext_shadercross,
         .ext_ttf = ext_ttf,
     };
 
@@ -263,6 +265,9 @@ pub fn runExample(b: *std.Build, sdl3: *std.Build.Module, cfg: Config, options: 
         if (std.mem.eql(u8, example, "net")) {
             can_run = options.ext_net;
         }
+        if (std.mem.eql(u8, example, "shadercross")) {
+            can_run = options.ext_shadercross;
+        }
         if (std.mem.eql(u8, example, "ttf")) {
             can_run = options.ext_ttf;
         }
@@ -293,6 +298,9 @@ pub fn setupExamples(
             // TODO unhardcode if we will need more extension-specific examples
             if (std.mem.eql(u8, name, "net")) {
                 build_example = options.ext_net;
+            }
+            if (std.mem.eql(u8, name, "shadercross")) {
+                build_example = options.ext_shadercross;
             }
             if (std.mem.eql(u8, name, "ttf")) {
                 build_example = options.ext_ttf;
