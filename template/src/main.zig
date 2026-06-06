@@ -33,11 +33,10 @@ const AppState = struct {
 /// Do our initialization logic here.
 ///
 /// ## Function Parameters
-/// * `app_state`: Where to store a pointer representing the state to use for the application.
 /// * `init_data`: Initialization data provided to the application.
 ///
 /// ## Return Value
-/// Returns if the app should continue running, or result in success or failure.
+/// Returns the app state along if the app should continue running, or result in success or failure.
 ///
 /// ## Remarks
 /// Note that for further callbacks (except for `quit()`), we assume that we did end up setting `app_state`.
@@ -45,9 +44,8 @@ const AppState = struct {
 /// Do not worry about logging errors from SDL yourself and just use `try` and `catch` as you please.
 /// If you set the error callback for every thread, then zig-sdl3 will be automatically logging errors.
 pub fn init(
-    app_state: *AppState,
-    init_data: sdl3.extras.Init,
-) !sdl3.AppResult {
+    init_data: sdl3.Init,
+) !struct { AppState, sdl3.AppResult } {
     _ = init_data;
 
     try sdl3.init(init_flags);
@@ -85,16 +83,17 @@ pub fn init(
     const dummy: ?sdl3.video.Window = sdl3.video.Window.fromId(99999) catch null;
     _ = dummy;
 
-    // Set app state.
-    app_state.* = .{
-        .frame_capper = frame_capper,
-        .window = window,
-        .renderer = renderer,
-        .tree_tex = tree_tex,
-    };
-
+    // Done setting up.
     try log_app.logInfo("Finished initializing", .{});
-    return .run;
+    return .{
+        .{
+            .frame_capper = frame_capper,
+            .window = window,
+            .renderer = renderer,
+            .tree_tex = tree_tex,
+        },
+        .run,
+    };
 }
 
 /// Do our render and update logic here.
@@ -166,7 +165,7 @@ pub fn event(
 /// Quit logic here.
 ///
 /// ## Function Parameters
-/// * `app_state`: Application state if it was set by `init()`, or `null` if `init()` did not set it (because of say an error).
+/// * `app_state`: Application state if it was set by `init()`, or `null` if `init()` if it didn't return an error.
 /// * `result`: Result indicating the success of the application. Should never be `AppResult.run`.
 ///
 /// ## Remarks

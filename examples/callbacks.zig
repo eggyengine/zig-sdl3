@@ -21,9 +21,8 @@ const AppState = struct {
 
 /// Runs once on application startup.
 pub fn init(
-    app_state: *AppState,
-    init_data: sdl3.extras.Init,
-) !sdl3.AppResult {
+    init_data: sdl3.Init,
+) !struct { AppState, sdl3.AppResult } {
     _ = init_data;
 
     try sdl3.init(init_flags);
@@ -35,11 +34,13 @@ pub fn init(
     errdefer window.deinit();
 
     // Finally create the application state.
-    app_state.* = .{
-        .fps_capper = .{ .mode = .{ .limited = fps } },
-        .window = window,
+    return .{
+        .{
+            .fps_capper = .{ .mode = .{ .limited = fps } },
+            .window = window,
+        },
+        .run,
     };
-    return .run;
 }
 
 /// Iterate function that is called once every frame.

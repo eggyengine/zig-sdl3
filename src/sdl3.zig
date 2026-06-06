@@ -398,6 +398,15 @@ pub const hints = @import("hints.zig");
 /// If there are errors using this, you need to ensure `ext_net` is set to `true`.
 pub const image = @import("image.zig");
 
+/// Initialization data that can be used for callbacks.
+///
+/// ## Remarks
+/// Arguments and environment are not provided as the init function contains the arguments, and SDL provides a mechanism for interacting with environment variables.
+///
+/// ## Version
+/// This struct is provided by zig-sdl3.
+pub const Init = @import("Init.zig");
+
 /// SDL does some preprocessor gymnastics to determine if any CPU-specific compiler intrinsics are available,
 /// as this is not necessarily an easy thing to calculate, and sometimes depends on quirks of a system, versions of build tools, and other external forces.
 ///
@@ -884,11 +893,10 @@ pub fn AppEventCallback(
 /// Function pointer typedef for init.
 ///
 /// ## Function Parameters
-/// * `app_state`: A place where the app can store data for future use.
 /// * `init`: Initialization struct similar to zig's juicy main.
 ///
 /// ## Return Value
-/// Returns `AppResult.failure` to terminate with an error, `AppResult.success` to terminate with success, `AppResult.run` to continue.
+/// Returns the app state along with `AppResult.failure` to terminate with an error, `AppResult.success` to terminate with success, `AppResult.run` to continue.
 ///
 /// ## Remarks
 /// These are used by `main.enterAppMainCallbacks()`.
@@ -901,9 +909,8 @@ pub fn AppInitCallback(
     comptime UserData: type,
 ) type {
     return *const fn (
-        app_state: *UserData,
-        init: extras.Init,
-    ) anyerror!AppResult;
+        init: Init,
+    ) anyerror!struct { UserData, AppResult };
 }
 
 /// Function pointer typedef for an update loop.

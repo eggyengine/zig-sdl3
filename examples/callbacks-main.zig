@@ -10,15 +10,14 @@ const init_flags = sdl3.InitFlags{ .video = true };
 const AppState = struct {
     fps_capper: sdl3.extras.FramerateCapper(f32),
     window: sdl3.video.Window,
-    init: sdl3.extras.Init,
+    init: sdl3.Init,
     heap_value: *i32,
 };
 
 /// Runs once on application startup.
 fn init(
-    app_state: *AppState,
-    init_data: sdl3.extras.Init,
-) !sdl3.AppResult {
+    init_data: sdl3.Init,
+) !struct { AppState, sdl3.AppResult } {
     try sdl3.init(init_flags);
     errdefer sdl3.quit(init_flags);
 
@@ -28,13 +27,15 @@ fn init(
     errdefer window.deinit();
 
     // Finally create the application state.
-    app_state.* = .{
-        .fps_capper = .{ .mode = .{ .limited = fps } },
-        .window = window,
-        .init = init_data,
-        .heap_value = try init_data.gpa.create(i32), // Init data comes with an allocator.
+    return .{
+        .{
+            .fps_capper = .{ .mode = .{ .limited = fps } },
+            .window = window,
+            .init = init_data,
+            .heap_value = try init_data.gpa.create(i32), // Init data comes with an allocator.
+        },
+        .run,
     };
-    return .run;
 }
 
 /// Iterate function that is called once every frame.

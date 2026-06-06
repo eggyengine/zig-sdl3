@@ -15,7 +15,7 @@ const std = @import("std");
 /// ## Version
 /// This datatype is available since SDL 3.2.0.
 pub const MainCallback = *const fn (
-    init: extras.Init,
+    init: sdl3.Init,
 ) anyerror!void;
 
 /// An entry point for SDL's use in main callbacks.
@@ -53,21 +53,21 @@ pub fn enterAppMainCallbacks(
     comptime app_quit: ?sdl3.AppQuitCallback(UserData),
 ) u8 {
     const AppState = struct {
-        init: *extras.Init,
+        init: *sdl3.Init,
         user_data: UserData,
     };
 
     const Cb = struct {
         pub fn init(app_state_c: [*c]?*anyopaque, arg_count_c: c_int, arg_values_c: [*c][*c]u8) callconv(.c) c_uint {
             app_state_c.* = null;
-            const main_init = extras.Init.init(std.heap.c_allocator, @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch return c.SDL_APP_FAILURE;
+            const main_init = sdl3.Init.init(std.heap.c_allocator, @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch return c.SDL_APP_FAILURE;
             const app_state = std.heap.c_allocator.create(AppState) catch {
                 main_init.deinit(std.heap.c_allocator);
                 return c.SDL_APP_FAILURE;
             };
             app_state.init = main_init;
             if (app_init) |cb| {
-                const ret = cb(&app_state.user_data, main_init.*) catch |err| {
+                const ret_user_data, const ret = cb(main_init.*) catch |err| {
                     std.log.err("{s}", .{@errorName(err)});
                     if (@errorReturnTrace()) |trace| {
                         std.debug.dumpErrorReturnTrace(trace);
@@ -76,10 +76,12 @@ pub fn enterAppMainCallbacks(
                     std.heap.c_allocator.destroy(app_state);
                     return c.SDL_APP_FAILURE;
                 };
+                app_state.user_data = ret_user_data;
                 app_state_c.* = app_state;
                 return @intFromEnum(ret);
             }
-            app_state_c.* = app_state;
+            main_init.deinit(std.heap.c_allocator);
+            std.heap.c_allocator.destroy(app_state);
             return c.SDL_APP_CONTINUE;
         }
         pub fn iterate(app_state_c: ?*anyopaque) callconv(.c) c_uint {
@@ -187,7 +189,7 @@ pub fn runApp(
 ) u8 {
     const Cb = struct {
         fn run(arg_count_c: c_int, arg_values_c: [*c][*c]u8) callconv(.c) c_int {
-            const init = extras.Init.init(std.heap.c_allocator, @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch return 1;
+            const init = sdl3.Init.init(std.heap.c_allocator, @as([*][*:0]u8, @ptrCast(arg_values_c))[0..@intCast(arg_count_c)]) catch return 1;
             defer init.deinit(std.heap.c_allocator);
 
             main_function(init.*) catch |err| {
@@ -220,22 +222,20 @@ pub fn setMainReady() void {
 }
 
 fn dummyMain(
-    init: extras.Init,
+    init: sdl3.Init,
 ) !void {
     try std.testing.expectEqualStrings("Hello", std.mem.span(init.args[0]));
     try std.testing.expectEqualStrings("World", std.mem.span(init.args[1]));
 }
 
 fn dummyInit(
-    app_state: *i32,
-    init: sdl3.extras.Init,
-) !sdl3.AppResult {
+    init: sdl3.Init,
+) !struct { i32, sdl3.AppResult } {
     if (init.args.len < 2)
-        return .failure;
+        return .{ 0, .failure };
     try std.testing.expectEqualStrings("Hello", std.mem.span(init.args[0]));
     try std.testing.expectEqualStrings("World", std.mem.span(init.args[1]));
-    app_state.* = 5;
-    return .run;
+    return .{ 5, .run };
 }
 
 fn dummyIterate(

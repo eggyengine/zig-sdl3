@@ -54,9 +54,8 @@ fn loadGraphicsShader(
 }
 
 pub fn init(
-    app_state: *AppState,
-    init_data: sdl3.extras.Init,
-) !sdl3.AppResult {
+    init_data: sdl3.Init,
+) !struct { AppState, sdl3.AppResult } {
     _ = init_data;
 
     // SDL3 setup.
@@ -96,26 +95,26 @@ pub fn init(
     const line_pipeline = try device.createGraphicsPipeline(pipeline_create_info);
     errdefer device.releaseGraphicsPipeline(line_pipeline);
 
-    // Prepare app state.
-    app_state.* = .{
-        .device = device,
-        .window = window,
-        .line_pipeline = line_pipeline,
-        .fill_pipeline = fill_pipeline,
-        .use_scissor_rect = false,
-        .use_small_viewport = false,
-        .use_wireframe_mode = false,
-    };
-
     // Finish setup.
     try sdl3.log.log("Press left to toggle wireframe", .{});
     try sdl3.log.log("Press down to toggle small viewport", .{});
     try sdl3.log.log("Press right to toggle scissor rect", .{});
     try sdl3.log.log(
         "State: {{Wireframe: {any}, SmallViewport: {any}, ScissorRect: {any}}}",
-        .{ app_state.use_wireframe_mode, app_state.use_small_viewport, app_state.use_scissor_rect },
+        .{ false, false, false },
     );
-    return .run;
+    return .{
+        .{
+            .device = device,
+            .window = window,
+            .line_pipeline = line_pipeline,
+            .fill_pipeline = fill_pipeline,
+            .use_scissor_rect = false,
+            .use_small_viewport = false,
+            .use_wireframe_mode = false,
+        },
+        .run,
+    };
 }
 
 pub fn iterate(
