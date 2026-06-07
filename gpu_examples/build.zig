@@ -55,7 +55,19 @@ fn compileShader(
             name,
             write_files,
         ),
-        .zig => @panic("Zig shader unsupported"),
+        .zig => sdl3_build.shaders.compileZigForFormats(
+            b,
+            .{
+                .input = b.path(b.fmt("shaders/zig/{s}.zig", .{name})),
+                .shadercross = shadercross,
+                .stage = stage,
+                .debug = gpu_debug,
+                .shader_metadata2zon = shader_metadata2zon,
+            },
+            shader_formats,
+            name,
+            write_files,
+        ),
     };
 }
 

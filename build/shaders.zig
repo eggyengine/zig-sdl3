@@ -22,6 +22,24 @@ pub const CompileHlslArgs = struct {
     shader_metadata2zon: ?*std.Build.Step.Compile = null,
 };
 
+/// Arguments for compiling zig.
+pub const CompileZigArgs = struct {
+    /// The shadercross executable.
+    shadercross: *std.Build.Step.Compile,
+    /// The input to compile.
+    input: std.Build.LazyPath,
+    /// The shader stage.
+    stage: ShadercrossStage,
+    /// The name of the shader entry point, otherwise "main".
+    entrypoint: ?[]const u8 = null,
+    /// The version of MSL to use, otherwise `1.2.0`.
+    msl_version: ?[]const u8 = null,
+    /// Generate debug information if possible.
+    debug: bool = false,
+    /// Program to convert JSON to ZON if ZON is specified, can be `null` if not needed.
+    shader_metadata2zon: ?*std.Build.Step.Compile = null,
+};
+
 /// An HLSL define.
 pub const HlslDefine = struct {
     /// Name of the variable to define.
@@ -173,6 +191,9 @@ pub fn compileHlsl(
     dest: ?ShadercrossFormat,
     output_name: []const u8,
 ) std.Build.LazyPath {
+    if (dest == .hlsl)
+        return args.input;
+
     return runShadercross(
         b,
         .{
@@ -259,6 +280,109 @@ pub fn compileShaderMetadata2Zon(
         .root_source_file = b.path("src/extras/gpu/GraphicsShaderMetadata.zig"),
     });
     return exe;
+}
+
+/// Compile a zig file using SPIR-V then shadercross.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `args`: Zig compilation arguments.
+/// * `dest`: The destination format to compile to.
+/// * `output_name`: Output name of the file to compile to.
+///
+/// ## Return Value
+/// Returns the compiled zig file path.
+pub fn compileZig(
+    b: *std.Build,
+    args: CompileZigArgs,
+    dest: ?ShadercrossFormat,
+    output_name: []const u8,
+) std.Build.LazyPath {
+    const spirv = compileZigToSpirv(b, args.input, b.fmt("{s}.spv", .{output_name}));
+    if (dest == .spirv)
+        return spirv;
+
+    return runShadercross(
+        b,
+        .{
+            .shadercross = args.shadercross,
+            .input = spirv,
+            .source = .spirv,
+            .stage = args.stage,
+            .entrypoint = args.entrypoint,
+            .msl_version = args.msl_version,
+            .debug = args.debug,
+            .pssl = false,
+            .shader_metadata2zon = args.shader_metadata2zon,
+        },
+        dest,
+        output_name,
+    );
+}
+
+/// Compile a zig file using SPIR-V then shadercross.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `args`: Zig compilation arguments.
+/// * `destination_formats`: The destination formats to generate for the outputs.
+/// * `output_base_name`: The base name to use for the output before the `.format_extension` is added to the end.
+/// * `write_files`: Write files step in case a copy is just needed.
+/// * `output_name`: Output name of the file to compile to.
+///
+/// ## Return Value
+/// Returns the compiled formats.
+pub fn compileZigForFormats(
+    b: *std.Build,
+    args: CompileZigArgs,
+    destination_formats: std.EnumSet(ShadercrossFormat),
+    output_base_name: []const u8,
+    write_files: *std.Build.Step.WriteFile,
+) ShaderFiles {
+    const spirv = compileZigToSpirv(b, args.input, output_base_name);
+    return runShadercrossForFormats(b, .{
+        .shadercross = args.shadercross,
+        .input = spirv,
+        .source = .spirv,
+        .stage = args.stage,
+        .entrypoint = args.entrypoint,
+        .msl_version = args.msl_version,
+        .debug = args.debug,
+        .pssl = false,
+        .shader_metadata2zon = args.shader_metadata2zon,
+    }, destination_formats, output_base_name, write_files);
+}
+
+/// Compile a zig shader to a SPIR-V binary.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `input`: Path to the zig file to compile.
+/// * `name`: Name of the module.
+///
+/// ## Return Value
+/// Return the emitted SPIR-V binary file.
+pub fn compileZigToSpirv(
+    b: *std.Build,
+    input: std.Build.LazyPath,
+    name: []const u8,
+) std.Build.LazyPath {
+    const obj = b.addObject(.{
+        .name = name,
+        .root_module = b.createModule(.{
+            .root_source_file = input,
+            .target = b.resolveTargetQuery(.{
+                .cpu_arch = .spirv32,
+                .cpu_model = .{ .explicit = &std.Target.spirv.cpu.generic },
+                .cpu_features_add = std.Target.spirv.featureSet(&.{.v1_0}),
+                .os_tag = .vulkan,
+                .ofmt = .spirv,
+            }),
+        }),
+        .use_llvm = false,
+        .use_lld = false,
+    });
+    return obj.getEmittedBin();
 }
 
 /// Run SDL shadercross.
