@@ -1,5 +1,23 @@
 const std = @import("std");
 
+/// Arguments for compiling GLSL.
+pub const CompileGlslArgs = struct {
+    /// The shadercross executable.
+    shadercross: *std.Build.Step.Compile,
+    /// The input to compile.
+    input: std.Build.LazyPath,
+    /// The shader stage.
+    stage: ShadercrossStage,
+    /// The name of the shader entry point, otherwise "main".
+    entrypoint: ?[]const u8 = null,
+    /// The version of MSL to use, otherwise `1.2.0`.
+    msl_version: ?[]const u8 = null,
+    /// Generate debug information if possible.
+    debug: bool = false,
+    /// Program to convert JSON to ZON if ZON is specified, can be `null` if not needed.
+    shader_metadata2zon: ?*std.Build.Step.Compile = null,
+};
+
 /// Arguments for compiling HLSL.
 pub const CompileHlslArgs = struct {
     /// The shadercross executable.
@@ -174,6 +192,110 @@ pub const ShadercrossStage = enum {
     fragment,
     compute,
 };
+
+/// Compile a GLSL file to SPIR-V then shadercross.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `args`: GLSL compilation arguments.
+/// * `dest`: The destination format to compile to.
+/// * `output_name`: Output name of the file to compile to.
+///
+/// ## Return Value
+/// Returns the compiled GLSL file path.
+pub fn compileGlsl(
+    b: *std.Build,
+    args: CompileGlslArgs,
+    dest: ?ShadercrossFormat,
+    output_name: []const u8,
+) std.Build.LazyPath {
+    const spirv = compileGlslToSpirv(b, args.input, output_name, args.stage, args.debug);
+    if (dest == .spirv)
+        return spirv;
+
+    return runShadercross(
+        b,
+        .{
+            .shadercross = args.shadercross,
+            .input = spirv,
+            .source = .spirv,
+            .stage = args.stage,
+            .entrypoint = args.entrypoint,
+            .msl_version = args.msl_version,
+            .debug = args.debug,
+            .pssl = false,
+            .shader_metadata2zon = args.shader_metadata2zon,
+        },
+        dest,
+        output_name,
+    );
+}
+
+/// Compile a GLSL file to SPIR-V then shadercross.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `args`: GLSL compilation arguments.
+/// * `destination_formats`: The destination formats to generate for the outputs.
+/// * `output_base_name`: The base name to use for the output before the `.format_extension` is added to the end.
+/// * `write_files`: Write files step in case a copy is just needed.
+/// * `output_name`: Output name of the file to compile to.
+///
+/// ## Return Value
+/// Returns the compiled formats.
+pub fn compileGlslForFormats(
+    b: *std.Build,
+    args: CompileGlslArgs,
+    destination_formats: std.EnumSet(ShadercrossFormat),
+    output_base_name: []const u8,
+    write_files: *std.Build.Step.WriteFile,
+) ShaderFiles {
+    const spirv = compileGlslToSpirv(b, args.input, output_base_name, args.stage, args.debug);
+    return runShadercrossForFormats(b, .{
+        .shadercross = args.shadercross,
+        .input = spirv,
+        .source = .spirv,
+        .stage = args.stage,
+        .entrypoint = args.entrypoint,
+        .msl_version = args.msl_version,
+        .debug = args.debug,
+        .pssl = false,
+        .shader_metadata2zon = args.shader_metadata2zon,
+    }, destination_formats, output_base_name, write_files);
+}
+
+/// Compile a GLSL shader to a SPIR-V binary.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `input`: Path to the GLSL file to compile.
+/// * `name`: Name of the module.
+/// * `stage`: Stage of the shader.
+/// * `debug`: If to include debug information.
+///
+/// ## Return Value
+/// Return the emitted SPIR-V binary file.
+pub fn compileGlslToSpirv(
+    b: *std.Build,
+    input: std.Build.LazyPath,
+    name: []const u8,
+    stage: ShadercrossStage,
+    debug: bool,
+) std.Build.LazyPath {
+    const glslang = b.findProgram(&.{"glslang"}, &.{}) catch @panic("glslang not found, can not compile GLSL shaders");
+    const glslang_cmd = b.addSystemCommand(&.{ glslang, "-V100", "-e", "main", "-S" });
+    glslang_cmd.addArg(switch (stage) {
+        .compute => "comp",
+        .fragment => "frag",
+        .vertex => "vert",
+    });
+    if (debug)
+        glslang_cmd.addArg("-g");
+
+    glslang_cmd.addFileArg(input);
+    glslang_cmd.addArg("-o");
+    return glslang_cmd.addOutputFileArg(b.fmt("{s}.spv", .{name}));
+}
 
 /// Compile an HLSL file using shadercross.
 ///

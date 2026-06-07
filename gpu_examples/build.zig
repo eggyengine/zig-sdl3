@@ -41,7 +41,19 @@ fn compileShader(
 
     const stage: sdl3_build.shaders.ShadercrossStage = if (std.mem.endsWith(u8, name, ".vert")) .vertex else if (std.mem.endsWith(u8, name, ".frag")) .fragment else if (std.mem.endsWith(u8, name, ".comp")) .compute else @panic(b.fmt("No stage detected for shader {s}", .{name}));
     return switch (shader_format) {
-        .glsl => @panic("GLSL shader unsupported"),
+        .glsl => sdl3_build.shaders.compileGlslForFormats(
+            b,
+            .{
+                .input = b.path(b.fmt("shaders/glsl/{s}.glsl", .{name})),
+                .shadercross = shadercross,
+                .stage = stage,
+                .debug = gpu_debug,
+                .shader_metadata2zon = shader_metadata2zon,
+            },
+            shader_formats,
+            name,
+            write_files,
+        ),
         .hlsl => sdl3_build.shaders.compileHlslForFormats(
             b,
             .{
