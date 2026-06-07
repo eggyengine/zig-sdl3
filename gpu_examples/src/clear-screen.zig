@@ -10,8 +10,15 @@ comptime {
 pub const _start = void;
 pub const WinMainCRTStartup = void;
 
-/// Allocator we will use.
-const allocator = std.heap.smp_allocator;
+const example_name = "Clear Screen";
+const screen_width = 1024;
+const screen_height = 576;
+const init_flags = sdl3.InitFlags{ .video = true };
+const shader_formats = sdl3.gpu.ShaderFormatFlags{
+    .dxil = true,
+    .msl = true,
+    .spirv = true,
+};
 
 const AppState = struct {
     device: sdl3.gpu.Device,
@@ -19,37 +26,31 @@ const AppState = struct {
 };
 
 pub fn init(
-    app_state: *?*AppState,
-    args: [][*:0]u8,
-) !sdl3.AppResult {
-    _ = args;
+    init_data: sdl3.Init,
+) !struct { AppState, sdl3.AppResult } {
 
     // SDL3 setup.
-    try sdl3.init(.{ .video = true });
-    sdl3.errors.error_callback = &sdl3.extras.sdlErrZigLog;
-    sdl3.log.setLogOutputFunction(void, &sdl3.extras.sdlLogZigLog, null);
+    _ = try sdl3.setMemoryFunctionsByAllocator(init_data.gpa);
+    sdl3.log.setLogOutputFunction(void, &sdl3.extras.loggers.zigLog, null);
+    try sdl3.init(init_flags);
 
-    // Get our GPU device that supports SPIR-V.
-    const shader_formats = sdl3.shadercross.getSpirvShaderFormats() orelse @panic("No formats available");
+    // Get our GPU device that supports available shader formats.
     const device = try sdl3.gpu.Device.init(shader_formats, options.gpu_debug, null);
     errdefer device.deinit();
 
     // Make our demo window.
-    const window = try sdl3.video.Window.init("Clear Screen", 640, 480, .{});
+    const window = try sdl3.video.Window.init(example_name, screen_width, screen_height, .{});
     errdefer window.deinit();
     try device.claimWindow(window);
 
-    // Prepare app state.
-    const state = try allocator.create(AppState);
-    errdefer allocator.destroy(state);
-    state.* = .{
-        .device = device,
-        .window = window,
-    };
-
     // Finish setup.
-    app_state.* = state;
-    return .run;
+    return .{
+        .{
+            .device = device,
+            .window = window,
+        },
+        .run,
+    };
 }
 
 pub fn iterate(
@@ -100,6 +101,8 @@ pub fn quit(
         val.device.releaseWindow(val.window);
         val.window.deinit();
         val.device.deinit();
-        allocator.destroy(val);
     }
+
+    sdl3.quit(init_flags);
+    sdl3.shutdown();
 }

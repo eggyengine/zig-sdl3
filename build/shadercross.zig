@@ -65,6 +65,8 @@ fn addDeps(
 /// Build the CLI executable.
 pub fn cli(
     b: *std.Build,
+    system_include_path: ?std.Build.LazyPath,
+    use_sdl_dep_lib: bool,
     dxc_support: bool,
 ) ?*std.Build.Step.Compile {
     const exe = b.addExecutable(.{
@@ -75,7 +77,13 @@ pub fn cli(
             .optimize = .ReleaseFast,
         }),
     });
-    addDeps(b, b.graph.host, .ReleaseFast, null, true, dxc_support, exe);
+    const sdl_dep_lib: ?*std.Build.Step.Compile = if (use_sdl_dep_lib) brk: {
+        const lib = (b.lazyDependency("sdl", .{ .target = b.graph.host, .optimize = .ReleaseFast }) orelse return null).artifact("SDL3");
+        if (system_include_path) |val|
+            lib.root_module.addSystemIncludePath(val);
+        break :brk lib;
+    } else null;
+    addDeps(b, b.graph.host, .ReleaseFast, system_include_path, sdl_dep_lib, true, dxc_support, exe) orelse return null;
     return exe;
 }
 

@@ -4,6 +4,7 @@ const zig = @import("builtin");
 pub const image = @import("build/image.zig");
 pub const net = @import("build/net.zig");
 pub const shadercross = @import("build/shadercross.zig");
+pub const shaders = @import("build/shaders.zig");
 pub const ttf = @import("build/ttf.zig");
 
 const ExampleOptions = struct {
