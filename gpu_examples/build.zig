@@ -4,12 +4,15 @@ const std = @import("std");
 const examples = [_]Example{
     .{ "basic-triangle", &.{ "rawTriangle.vert", "solidColor.frag" } },
     .{ "clear-screen", &.{} },
+    .{ "textured-quad", &.{ "texturedQuad.vert", "texturedQuad.frag" } },
 };
 
 const shaders = [_][]const u8{
     "rawTriangle.vert",
+    "texturedQuad.vert",
 
     "solidColor.frag",
+    "texturedQuad.frag",
 };
 
 const Example = struct {
