@@ -34,16 +34,17 @@ const ravioli_bmp = @embedFile("images/ravioli.bmp");
 const window_width = 640;
 const window_height = 480;
 
-const PositionTextureVertex = extern struct {
-    position: [3]f32,
-    tex_coord: [2]f32,
-};
+const other_buffers = &.{};
+const Vertex = sdl3.extras.gpu.vertexBufferTypes(
+    sdl3.extras.gpu.getGraphicsShaderMetadata(vert_shader),
+    other_buffers,
+)[0];
 
-const vertices = [_]PositionTextureVertex{
-    .{ .position = .{ -1, 1, 0 }, .tex_coord = .{ 0, 0 } },
-    .{ .position = .{ 1, 1, 0 }, .tex_coord = .{ 4, 0 } },
-    .{ .position = .{ 1, -1, 0 }, .tex_coord = .{ 4, 4 } },
-    .{ .position = .{ -1, -1, 0 }, .tex_coord = .{ 0, 4 } },
+const vertices = [_]Vertex{
+    .{ .pos = .{ -1, 1, 0 }, .tex_coord = .{ 0, 0 } },
+    .{ .pos = .{ 1, 1, 0 }, .tex_coord = .{ 4, 0 } },
+    .{ .pos = .{ 1, -1, 0 }, .tex_coord = .{ 4, 4 } },
+    .{ .pos = .{ -1, -1, 0 }, .tex_coord = .{ 0, 4 } },
 };
 const vertices_bytes = std.mem.asBytes(&vertices);
 
@@ -119,10 +120,12 @@ pub fn init(
         .vertex_shader = vertex_shader,
         .fragment_shader = fragment_shader,
         .vertex_input_state = .{
+            // .vertex_buffer_descriptions = vertex_buffers_info.vertex_buffer_descriptions,
+            // .vertex_attributes = vertex_buffers_info.vertex_attributes,
             .vertex_buffer_descriptions = &.{
                 .{
                     .slot = 0,
-                    .pitch = @sizeOf(PositionTextureVertex),
+                    .pitch = @sizeOf(Vertex),
                     .input_rate = .vertex,
                 },
             },
@@ -131,13 +134,13 @@ pub fn init(
                     .location = 0,
                     .buffer_slot = 0,
                     .format = .f32x3,
-                    .offset = @offsetOf(PositionTextureVertex, "position"),
+                    .offset = @offsetOf(Vertex, "pos"),
                 },
                 .{
                     .location = 1,
                     .buffer_slot = 0,
                     .format = .f32x2,
-                    .offset = @offsetOf(PositionTextureVertex, "tex_coord"),
+                    .offset = @offsetOf(Vertex, "tex_coord"),
                 },
             },
         },
@@ -146,63 +149,27 @@ pub fn init(
     errdefer device.releaseGraphicsPipeline(pipeline);
 
     // Create samplers.
+    var samplers_initialized_num: usize = 0;
     var samplers: [sampler_names.len]sdl3.gpu.Sampler = undefined;
-    samplers[0] = try device.createSampler(.{
-        .min_filter = .nearest,
-        .mag_filter = .nearest,
-        .mipmap_mode = .nearest,
-        .address_mode_u = .clamp_to_edge,
-        .address_mode_v = .clamp_to_edge,
-        .address_mode_w = .clamp_to_edge,
-    });
-    errdefer device.releaseSampler(samplers[0]);
-    samplers[1] = try device.createSampler(.{
-        .min_filter = .nearest,
-        .mag_filter = .nearest,
-        .mipmap_mode = .nearest,
-        .address_mode_u = .repeat,
-        .address_mode_v = .repeat,
-        .address_mode_w = .repeat,
-    });
-    errdefer device.releaseSampler(samplers[1]);
-    samplers[2] = try device.createSampler(.{
-        .min_filter = .linear,
-        .mag_filter = .linear,
-        .mipmap_mode = .linear,
-        .address_mode_u = .clamp_to_edge,
-        .address_mode_v = .clamp_to_edge,
-        .address_mode_w = .clamp_to_edge,
-    });
-    errdefer device.releaseSampler(samplers[2]);
-    samplers[3] = try device.createSampler(.{
-        .min_filter = .linear,
-        .mag_filter = .linear,
-        .mipmap_mode = .linear,
-        .address_mode_u = .repeat,
-        .address_mode_v = .repeat,
-        .address_mode_w = .repeat,
-    });
-    errdefer device.releaseSampler(samplers[3]);
-    samplers[4] = try device.createSampler(.{
-        .min_filter = .linear,
-        .mag_filter = .linear,
-        .mipmap_mode = .linear,
-        .address_mode_u = .clamp_to_edge,
-        .address_mode_v = .clamp_to_edge,
-        .address_mode_w = .clamp_to_edge,
-        .max_anisotropy = 4,
-    });
-    errdefer device.releaseSampler(samplers[4]);
-    samplers[5] = try device.createSampler(.{
-        .min_filter = .linear,
-        .mag_filter = .linear,
-        .mipmap_mode = .linear,
-        .address_mode_u = .repeat,
-        .address_mode_v = .repeat,
-        .address_mode_w = .repeat,
-        .max_anisotropy = 4,
-    });
-    errdefer device.releaseSampler(samplers[5]);
+    errdefer for (samplers[0..samplers_initialized_num]) |sampler| {
+        device.releaseSampler(sampler);
+    };
+    for (&samplers, 0..) |*sampler, sampler_ind| {
+        const filter_mode: sdl3.gpu.Filter = if (sampler_ind < 2) .nearest else .linear;
+        const mipmap_mode: sdl3.gpu.SamplerMipmapMode = if (sampler_ind < 2) .nearest else .linear;
+        const address_mode: sdl3.gpu.SamplerAddressMode = if (sampler_ind % 2 == 0) .clamp_to_edge else .repeat;
+        const max_anisotropy: ?f32 = if (sampler_ind > 3) 4 else null;
+        sampler.* = try device.createSampler(.{
+            .min_filter = filter_mode,
+            .mag_filter = filter_mode,
+            .mipmap_mode = mipmap_mode,
+            .address_mode_u = address_mode,
+            .address_mode_v = address_mode,
+            .address_mode_w = address_mode,
+            .max_anisotropy = max_anisotropy,
+        });
+        samplers_initialized_num += 1;
+    }
 
     // Prepare vertex buffer.
     const vertex_buffer = try device.createBuffer(.{

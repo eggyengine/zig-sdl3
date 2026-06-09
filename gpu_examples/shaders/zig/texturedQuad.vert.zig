@@ -3,7 +3,7 @@ const std = @import("std");
 const position_in = @extern(
     *addrspace(.input) @Vector(3, f32),
     .{
-        .name = "position_in",
+        .name = "pos",
         .decoration = .{
             .location = 0,
         },
@@ -12,7 +12,7 @@ const position_in = @extern(
 const tex_coord_in = @extern(
     *addrspace(.input) @Vector(2, f32),
     .{
-        .name = "tex_coord_in",
+        .name = "tex_coord",
         .decoration = .{
             .location = 1,
         },
@@ -22,7 +22,7 @@ const tex_coord_in = @extern(
 const tex_coord_out = @extern(
     *addrspace(.output) @Vector(2, f32),
     .{
-        .name = "tex_coord_out",
+        .name = "tex_coord",
         .decoration = .{
             .location = 0,
         },

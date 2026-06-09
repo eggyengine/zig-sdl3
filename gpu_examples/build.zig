@@ -69,6 +69,7 @@ fn compileShader(
             shader_formats,
             name,
             write_files,
+            true,
         ),
         .zig => sdl3_build.shaders.compileZigForFormats(
             b,

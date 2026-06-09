@@ -6,7 +6,7 @@ const texture = gputils.Sampler2d(2, 0);
 const tex_coord_in = @extern(
     *addrspace(.input) @Vector(2, f32),
     .{
-        .name = "tex_coord_in",
+        .name = "tex_coord",
         .decoration = .{
             .location = 0,
         },
@@ -16,7 +16,7 @@ const tex_coord_in = @extern(
 const color_out = @extern(
     *addrspace(.output) @Vector(4, f32),
     .{
-        .name = "color_out",
+        .name = "color",
         .decoration = .{
             .location = 0,
         },

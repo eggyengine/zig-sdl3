@@ -304,6 +304,7 @@ pub fn compileGlslToSpirv(
 /// * `args`: HLSL compilation arguments.
 /// * `dest`: The destination format to compile to.
 /// * `output_name`: Output name of the file to compile to.
+/// * `compile_to_spirv_first`: If to compile the shader to SPIR-V before doing anything.
 ///
 /// ## Return Value
 /// Returns the compiled HLSL file path.
@@ -312,28 +313,51 @@ pub fn compileHlsl(
     args: CompileHlslArgs,
     dest: ?ShadercrossFormat,
     output_name: []const u8,
+    compile_to_spirv_first: bool,
 ) std.Build.LazyPath {
     if (dest == .hlsl)
         return args.input;
 
-    return runShadercross(
-        b,
-        .{
-            .shadercross = args.shadercross,
-            .input = args.input,
-            .source = .hlsl,
-            .stage = args.stage,
-            .entrypoint = args.entrypoint,
-            .hlsl_include_directory = args.hlsl_include_directory,
-            .hlsl_defines = args.hlsl_defines,
-            .msl_version = args.msl_version,
-            .debug = args.debug,
-            .pssl = false,
-            .shader_metadata2zon = args.shader_metadata2zon,
-        },
-        dest,
-        output_name,
-    );
+    if (compile_to_spirv_first) {
+        const spirv = compileHlslToSpirv(b, args.input, output_name, args.stage, args.debug);
+        if (dest == .spirv)
+            return spirv;
+        return runShadercross(
+            b,
+            .{
+                .shadercross = args.shadercross,
+                .input = spirv,
+                .source = .spirv,
+                .stage = args.stage,
+                .entrypoint = args.entrypoint,
+                .msl_version = args.msl_version,
+                .debug = args.debug,
+                .pssl = false,
+                .shader_metadata2zon = args.shader_metadata2zon,
+            },
+            dest,
+            output_name,
+        );
+    } else {
+        return runShadercross(
+            b,
+            .{
+                .shadercross = args.shadercross,
+                .input = args.input,
+                .source = .hlsl,
+                .stage = args.stage,
+                .entrypoint = args.entrypoint,
+                .hlsl_include_directory = args.hlsl_include_directory,
+                .hlsl_defines = args.hlsl_defines,
+                .msl_version = args.msl_version,
+                .debug = args.debug,
+                .pssl = false,
+                .shader_metadata2zon = args.shader_metadata2zon,
+            },
+            dest,
+            output_name,
+        );
+    }
 }
 
 /// Compile an HLSL file using shadercross.
@@ -345,6 +369,7 @@ pub fn compileHlsl(
 /// * `output_base_name`: The base name to use for the output before the `.format_extension` is added to the end.
 /// * `write_files`: Write files step in case a copy is just needed.
 /// * `output_name`: Output name of the file to compile to.
+/// * `compile_to_spirv_first`: If to compile the shader to SPIR-V before doing anything.
 ///
 /// ## Return Value
 /// Returns the compiled formats.
@@ -354,26 +379,75 @@ pub fn compileHlslForFormats(
     destination_formats: std.EnumSet(ShadercrossFormat),
     output_base_name: []const u8,
     write_files: *std.Build.Step.WriteFile,
+    compile_to_spirv_first: bool,
 ) ShaderFiles {
-    return runShadercrossForFormats(
-        b,
-        .{
+    if (compile_to_spirv_first) {
+        const spirv = compileHlslToSpirv(b, args.input, output_base_name, args.stage, args.debug);
+        return runShadercrossForFormats(b, .{
             .shadercross = args.shadercross,
-            .input = args.input,
-            .source = .hlsl,
+            .input = spirv,
+            .source = .spirv,
             .stage = args.stage,
             .entrypoint = args.entrypoint,
-            .hlsl_include_directory = args.hlsl_include_directory,
-            .hlsl_defines = args.hlsl_defines,
             .msl_version = args.msl_version,
             .debug = args.debug,
             .pssl = false,
             .shader_metadata2zon = args.shader_metadata2zon,
-        },
-        destination_formats,
-        output_base_name,
-        write_files,
-    );
+        }, destination_formats, output_base_name, write_files);
+    } else {
+        return runShadercrossForFormats(
+            b,
+            .{
+                .shadercross = args.shadercross,
+                .input = args.input,
+                .source = .hlsl,
+                .stage = args.stage,
+                .entrypoint = args.entrypoint,
+                .hlsl_include_directory = args.hlsl_include_directory,
+                .hlsl_defines = args.hlsl_defines,
+                .msl_version = args.msl_version,
+                .debug = args.debug,
+                .pssl = false,
+                .shader_metadata2zon = args.shader_metadata2zon,
+            },
+            destination_formats,
+            output_base_name,
+            write_files,
+        );
+    }
+}
+
+/// Compile am HLSL shader to a SPIR-V binary.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `input`: Path to the HLSL file to compile.
+/// * `name`: Name of the module.
+/// * `stage`: Stage of the shader.
+/// * `debug`: If to include debug information.
+///
+/// ## Return Value
+/// Return the emitted SPIR-V binary file.
+pub fn compileHlslToSpirv(
+    b: *std.Build,
+    input: std.Build.LazyPath,
+    name: []const u8,
+    stage: ShadercrossStage,
+    debug: bool,
+) std.Build.LazyPath {
+    const glslang = b.findProgram(&.{"glslang"}, &.{}) catch @panic("glslang not found, can not compile HLSL shaders");
+    const glslang_cmd = b.addSystemCommand(&.{ glslang, "-V100", "-e", "main", "-D", "-S" });
+    glslang_cmd.addArg(switch (stage) {
+        .compute => "comp",
+        .fragment => "frag",
+        .vertex => "vert",
+    });
+    if (debug)
+        glslang_cmd.addArg("-g");
+
+    glslang_cmd.addFileArg(input);
+    glslang_cmd.addArg("-o");
+    return glslang_cmd.addOutputFileArg(b.fmt("{s}.spv", .{name}));
 }
 
 /// Compile the shader metadata to zon program.

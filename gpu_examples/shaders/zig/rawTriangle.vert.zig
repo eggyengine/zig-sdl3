@@ -3,7 +3,7 @@ const std = @import("std");
 const color_out = @extern(
     *addrspace(.output) @Vector(4, f32),
     .{
-        .name = "color_out",
+        .name = "color",
         .decoration = .{
             .location = 0,
         },

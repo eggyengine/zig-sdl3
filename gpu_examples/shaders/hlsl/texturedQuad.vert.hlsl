@@ -1,19 +1,19 @@
 struct Input
 {
-    float3 Position : TEXCOORD0;
-    float2 TexCoord : TEXCOORD1;
+    float3 pos : TEXCOORD0;
+    float2 tex_coord : TEXCOORD1;
 };
 
 struct Output
 {
-    float2 TexCoord : TEXCOORD0;
-    float4 Position : SV_Position;
+    float2 tex_coord : TEXCOORD0;
+    float4 pos : SV_Position;
 };
 
 Output main(Input input)
 {
     Output output;
-    output.TexCoord = input.TexCoord;
-    output.Position = float4(input.Position, 1.0f);
+    output.tex_coord = input.tex_coord;
+    output.pos = float4(input.pos, 1.0f);
     return output;
 }
