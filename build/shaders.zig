@@ -461,7 +461,24 @@ pub fn compileZigForFormats(
     output_base_name: []const u8,
     write_files: *std.Build.Step.WriteFile,
 ) ShaderFiles {
-    const spirv = compileZigToSpirv(b, args.input, output_base_name);
+    var spirv = compileZigToSpirv(b, args.input, output_base_name);
+
+    // Remove duplicate type definitions that might be done by inline assembly along with optimize the SPIR-V.
+    if (b.findProgram(&.{"spirv-opt"}, &.{})) |spirv_opt| {
+        const spirv_fix = b.addSystemCommand(&.{ spirv_opt, "--remove-duplicates", "--skip-validation", "--trim-capabilities" });
+        spirv_fix.addFileArg(spirv);
+        spirv_fix.addArg("-o");
+        spirv = spirv_fix.addOutputFileArg(b.fmt("{s}-fixed.spv", .{output_base_name}));
+
+        // Optimize the SPIR-V.
+        const spirv_optimize = b.addSystemCommand(&.{ spirv_opt, "-O" });
+        spirv_optimize.addFileArg(spirv);
+        spirv_optimize.addArg("-o");
+        spirv = spirv_optimize.addOutputFileArg(b.fmt("{s}-optimized.spv", .{output_base_name}));
+    } else |_| {
+        std.debug.print("Unable to find spirv-opt is missing, expect unoptimal performance or bugs\n", .{});
+    }
+
     return runShadercrossForFormats(b, .{
         .shadercross = args.shadercross,
         .input = spirv,
