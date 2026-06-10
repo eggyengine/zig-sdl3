@@ -249,6 +249,7 @@ pub fn loadGraphicsShaderEmbeddedWithMetadata(
 }
 
 /// Generate vertex buffer types based on a vertex shader's metadata. TODO: ADD FIELD THAT CONTAINS SLICE OF LOCATIONS TO NORMALIZE PAIRED WITH TYPES!
+///
 /// ## Function Parameters
 /// * `vertex_shader_metadata`: Shader metadata for the vertex shader.
 /// * `other_buffers`: Any grouping of variables to put in other buffers (starting at index `1`). Any unspecified locations will end up in buffer `0`.
