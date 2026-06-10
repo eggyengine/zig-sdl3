@@ -46,6 +46,8 @@ jobs:
       - uses: https://codeberg.org/mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
+      - name: Install SPIR-V Tools
+        run: sudo apt install spirv-tools -y
       - name: Build Examples Linux
         run: cd gpu_examples && zig build examples -Dtarget=x86_64-linux-gnu
       - name: Build Examples Windows
