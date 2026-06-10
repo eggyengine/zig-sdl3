@@ -38,6 +38,20 @@ jobs:
         run: zig build examples -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
       - name: Build Examples Windows
         run: zig build examples -Dtarget=x86_64-windows -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+  gpu_examples:
+    name: Build GPU Examples
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: https://codeberg.org/mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Install SPIR-V Tools
+        run: apt update && apt install spirv-tools -y
+      - name: Build Examples Linux
+        run: cd gpu_examples && zig build examples -Dtarget=x86_64-linux-gnu
+      - name: Build Examples Windows
+        run: cd gpu_examples && zig build examples -Dtarget=x86_64-windows
   template:
     name: Build Template
     runs-on: docker

@@ -8,6 +8,9 @@ const timer = @import("timer.zig");
 /// Set `errors.error_callback` to one of these entries.
 pub const error_handlers = @import("extras/error_handlers.zig");
 
+/// GPU extras.
+pub const gpu = @import("extras/gpu.zig");
+
 /// Helpful logger functions that can be used to set SDL3' logging function.
 ///
 /// ## Remarks
