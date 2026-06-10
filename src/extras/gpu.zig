@@ -2,6 +2,9 @@ const gpu = @import("../gpu.zig");
 const log = @import("../log.zig");
 const std = @import("std");
 
+/// Metadata for compute pipelines.
+pub const ComputePipelineMetadata = @import("gpu/ComputePipelineMetadata.zig");
+
 /// Metadata for graphics shaders.
 pub const GraphicsShaderMetadata = @import("gpu/GraphicsShaderMetadata.zig");
 
@@ -74,11 +77,13 @@ pub fn ensureCompatibleGraphicsShaders(
 /// * `vertex_shader_metadata`: The metadata for the vertex shader.
 /// * `fragment_shader_metadata`: The metadata for the fragment shader.
 pub inline fn ensureCompatibleGraphicsShadersComptime(
-    comptime vertex_shader_metadata: GraphicsShaderMetadata,
-    comptime fragment_shader_metadata: GraphicsShaderMetadata,
+    comptime vertex_shader_metadata: anytype,
+    comptime fragment_shader_metadata: anytype,
 ) void {
-    outer: inline for (fragment_shader_metadata.inputs) |input| {
-        inline for (vertex_shader_metadata.outputs) |output| {
+    const vertex_shader_metadata_true = getGraphicsShaderMetadata(vertex_shader_metadata);
+    const fragment_shader_metadata_true = getGraphicsShaderMetadata(fragment_shader_metadata);
+    outer: inline for (fragment_shader_metadata_true.inputs) |input| {
+        inline for (vertex_shader_metadata_true.outputs) |output| {
             if (output.location == input.location) {
                 if (output.type != input.type) {
                     @compileError(std.fmt.comptimePrint("Fragment shader input \"{s}\" with type \"{s}\" and vertex shader output \"{s}\" with type \"{s}\" at location {d} have mismatching types", .{
@@ -97,17 +102,39 @@ pub inline fn ensureCompatibleGraphicsShadersComptime(
     }
 }
 
-/// Get the graphics shader metadata at compile time
+/// Get the compute pipeline metadata at compile time.
 ///
 /// ## Function Parameters
-/// * `shader`: The embedded shader to load.
+/// * `metadata`: The embedded shader data to load.
+///
+/// ## Return Value
+/// Returns the compute pipeline metadata.
+pub fn getComputePipelineMetadata(
+    metadata: anytype,
+) ComputePipelineMetadata {
+    return .{
+        .readonly_storage_buffers = metadata.readonly_storage_buffers,
+        .readonly_storage_textures = metadata.readonly_storage_textures,
+        .readwrite_storage_buffers = metadata.readwrite_storage_buffers,
+        .readwrite_storage_textures = metadata.readwrite_storage_textures,
+        .samplers = metadata.samplers,
+        .threadcount_x = metadata.threadcount_x,
+        .threadcount_y = metadata.threadcount_y,
+        .threadcount_z = metadata.threadcount_z,
+        .uniform_buffers = metadata.uniform_buffers,
+    };
+}
+
+/// Get the graphics shader metadata at compile time.
+///
+/// ## Function Parameters
+/// * `metadata`: The embedded shader data to load.
 ///
 /// ## Return Value
 /// Returns the graphics shader metadata.
 pub fn getGraphicsShaderMetadata(
-    shader: anytype,
+    metadata: anytype,
 ) GraphicsShaderMetadata {
-    const metadata = shader.zon.data;
     var inputs: [metadata.inputs.len]GraphicsShaderMetadata.Var = undefined;
     var outputs: [metadata.outputs.len]GraphicsShaderMetadata.Var = undefined;
     inline for (0..inputs.len) |ind| {
@@ -134,7 +161,59 @@ pub fn getGraphicsShaderMetadata(
     };
 }
 
-/// Load an embedded graphics shader and use its metadata (will error if not exists).
+/// Get the metadata field for a shader.
+///
+/// ## Function Parameters
+/// * `shader`: The shader to get the metadata field of.
+///
+/// ## Return Value
+/// Returns the field containing shader metadata.
+pub fn getShaderMetadataField(
+    shader: anytype,
+) @TypeOf(shader.zon.data) {
+    return shader.zon.data;
+}
+
+/// Load an embedded compute pipeline and use its metadata (will error if not exists). TODO: Add function for loading from content with a map of kernels!
+///
+/// ## Function Parameters
+/// * `device`: The GPU device.
+/// * `compute_kernel`: The embedded compute kernel to load.
+///
+/// ## Return Value
+/// Returns the loaded compute pipeline.
+pub fn loadComputePipelineEmbeddedWithMetadata(
+    device: gpu.Device,
+    compute_kernel: anytype,
+) !gpu.ComputePipeline {
+    const supported_formats = device.getShaderFormats();
+    const pipeline_metadata = getComputePipelineMetadata(getShaderMetadataField(compute_kernel));
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
+        if (@hasDecl(compute_kernel, field.name) and @field(supported_formats, field.name)) {
+            var created_format = gpu.ShaderFormatFlags{};
+            @field(created_format, field.name) = true;
+            return try device.createComputePipeline(.{
+                .code = @field(compute_kernel, field.name).data,
+                .entry_point = compute_kernel.entry_point,
+                .format = created_format,
+                .thread_count_x = pipeline_metadata.threadcount_x,
+                .thread_count_y = pipeline_metadata.threadcount_y,
+                .thread_count_z = pipeline_metadata.threadcount_z,
+                .num_readonly_storage_buffers = pipeline_metadata.readonly_storage_buffers,
+                .num_readonly_storage_textures = pipeline_metadata.readonly_storage_textures,
+                .num_readwrite_storage_buffers = pipeline_metadata.readwrite_storage_buffers,
+                .num_readwrite_storage_textures = pipeline_metadata.readwrite_storage_textures,
+                .num_samplers = pipeline_metadata.samplers,
+                .num_uniform_buffers = pipeline_metadata.uniform_buffers,
+                .props = .{ .name = compute_kernel.name },
+            });
+        }
+    }
+    try log.Category.gpu.logError("Unable to load compute kernel for format {any}", .{supported_formats});
+    return error.UnsupportedFormat;
+}
+
+/// Load an embedded graphics shader and use its metadata (will error if not exists). TODO: Add function for loading from content with a map of shaders!
 ///
 /// ## Function Parameters
 /// * `device`: The GPU device.
@@ -147,7 +226,7 @@ pub fn loadGraphicsShaderEmbeddedWithMetadata(
     shader: anytype,
 ) !gpu.Shader {
     const supported_formats = device.getShaderFormats();
-    const shader_metadata = getGraphicsShaderMetadata(shader);
+    const shader_metadata = getGraphicsShaderMetadata(getShaderMetadataField(shader));
     inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
         if (@hasDecl(shader, field.name) and @field(supported_formats, field.name)) {
             var created_format = gpu.ShaderFormatFlags{};
@@ -177,11 +256,12 @@ pub fn loadGraphicsShaderEmbeddedWithMetadata(
 /// ## Return Value
 /// Returns the vertex buffer information.
 pub fn vertexBufferTypes(
-    comptime vertex_shader_metadata: GraphicsShaderMetadata,
+    comptime vertex_shader_metadata: anytype,
     comptime other_buffers: []const []VariableLocation,
 ) [other_buffers.len + 1]type {
     comptime {
-        const num_attribs = vertex_shader_metadata.inputs.len;
+        const vertex_shader_metadata_true = getGraphicsShaderMetadata(vertex_shader_metadata);
+        const num_attribs = vertex_shader_metadata_true.inputs.len;
         const num_buffers = other_buffers.len + 1;
 
         var vertex_attrib_buffer_slots: [num_attribs]usize = undefined;
@@ -190,7 +270,7 @@ pub fn vertexBufferTypes(
         var vertex_buffer_lens: [num_buffers]usize = @splat(0);
 
         // Populate vertex attributes mostly.
-        for (&vertex_attrib_buffer_slots, &vertex_attrib_types, vertex_shader_metadata.inputs) |*attrib_buffer_slot, *attrib_type, input| {
+        for (&vertex_attrib_buffer_slots, &vertex_attrib_types, vertex_shader_metadata_true.inputs) |*attrib_buffer_slot, *attrib_type, input| {
             attrib_buffer_slot.* = 0; // In case no other buffer found.
             attrib_type.* = input.type.zigType();
             for (other_buffers, 1..) |other_buffer, other_buffer_ind| {
@@ -217,7 +297,7 @@ pub fn vertexBufferTypes(
             var attrib_indices: [vertex_buffer_len]usize = undefined;
 
             var curr_field_ind = 0;
-            for (&vertex_attrib_buffer_slots, &vertex_attrib_types, vertex_shader_metadata.inputs, 0..) |attrib_buffer_slot, vertex_attrib_type, input, attrib_index| {
+            for (&vertex_attrib_buffer_slots, &vertex_attrib_types, vertex_shader_metadata_true.inputs, 0..) |attrib_buffer_slot, vertex_attrib_type, input, attrib_index| {
                 if (attrib_buffer_slot == vertex_buffer_ind) {
                     field_names[curr_field_ind] = if (std.mem.cutScalarLast(u8, input.name, '.')) |val| val[1] else input.name;
                     field_types[curr_field_ind] = vertex_attrib_type;

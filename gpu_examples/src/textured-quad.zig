@@ -22,10 +22,12 @@ const shader_formats = sdl3.gpu.ShaderFormatFlags{
 // Shaders.
 const vert_shader = @import("texturedQuad.vert.zig");
 const frag_shader = @import("texturedQuad.frag.zig");
+const vert_shader_metadata = sdl3.extras.gpu.getShaderMetadataField(vert_shader);
+const frag_shader_metadata = sdl3.extras.gpu.getShaderMetadataField(frag_shader);
 comptime {
     sdl3.extras.gpu.ensureCompatibleGraphicsShadersComptime(
-        sdl3.extras.gpu.getGraphicsShaderMetadata(vert_shader),
-        sdl3.extras.gpu.getGraphicsShaderMetadata(frag_shader),
+        vert_shader_metadata,
+        frag_shader_metadata,
     );
 }
 
@@ -36,7 +38,7 @@ const window_height = 480;
 
 const other_buffers = &.{};
 const Vertex = sdl3.extras.gpu.vertexBufferTypes(
-    sdl3.extras.gpu.getGraphicsShaderMetadata(vert_shader),
+    vert_shader_metadata,
     other_buffers,
 )[0];
 

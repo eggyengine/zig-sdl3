@@ -472,9 +472,37 @@ pub fn compileShaderMetadata2Zon(
             ),
         },
     );
+    exe.root_module.addAnonymousImport("ComputePipelineMetadata", .{
+        .root_source_file = b.path("src/extras/gpu/ComputePipelineMetadata.zig"),
+    });
     exe.root_module.addAnonymousImport("GraphicsShaderMetadata", .{
         .root_source_file = b.path("src/extras/gpu/GraphicsShaderMetadata.zig"),
     });
+    return exe;
+}
+
+/// Compile the spirv execution mode program.
+///
+/// ## Function Parameters
+/// * `b`: The build system of SDL3.
+///
+/// ## Return Value
+/// Returns the executable.
+pub fn compileSpirvExecutionMode(
+    b: *std.Build,
+) *std.Build.Step.Compile {
+    const exe = b.addExecutable(
+        .{
+            .name = "spirv-execution-mode",
+            .root_module = b.createModule(
+                .{
+                    .root_source_file = b.path("build/tools/spirv_execution_mode.zig"),
+                    .target = b.graph.host,
+                    .optimize = .ReleaseFast,
+                },
+            ),
+        },
+    );
     return exe;
 }
 
@@ -485,6 +513,8 @@ pub fn compileShaderMetadata2Zon(
 /// * `args`: Zig compilation arguments.
 /// * `dest`: The destination format to compile to.
 /// * `output_name`: Output name of the file to compile to.
+/// * `spirv_execution_mode`: SPIR-V execution mode commandline tool (can be undefined unless `execution_mode_fix_args` is set).
+/// * `execution_mode_fix_args`: Arguments needed for the execution mode tool to fix the assembly.
 ///
 /// ## Return Value
 /// Returns the compiled zig file path.
@@ -493,8 +523,10 @@ pub fn compileZig(
     args: CompileZigArgs,
     dest: ?ShadercrossFormat,
     output_name: []const u8,
+    spirv_execution_mode: *std.Build.Step.Compile,
+    execution_mode_fix_args: ?[]const []const u8,
 ) std.Build.LazyPath {
-    const spirv = compileZigToSpirv(b, args.input, b.fmt("{s}.spv", .{output_name}));
+    const spirv = compileZigToSpirv(b, args.input, b.fmt("{s}.spv", .{output_name}), spirv_execution_mode, execution_mode_fix_args);
     if (dest == .spirv)
         return spirv;
 
@@ -524,7 +556,8 @@ pub fn compileZig(
 /// * `destination_formats`: The destination formats to generate for the outputs.
 /// * `output_base_name`: The base name to use for the output before the `.format_extension` is added to the end.
 /// * `write_files`: Write files step in case a copy is just needed.
-/// * `output_name`: Output name of the file to compile to.
+/// * `spirv_execution_mode`: SPIR-V execution mode commandline tool (can be undefined unless `execution_mode_fix_args` is set).
+/// * `execution_mode_fix_args`: Arguments needed for the execution mode tool to fix the assembly.
 ///
 /// ## Return Value
 /// Returns the compiled formats.
@@ -534,24 +567,10 @@ pub fn compileZigForFormats(
     destination_formats: std.EnumSet(ShadercrossFormat),
     output_base_name: []const u8,
     write_files: *std.Build.Step.WriteFile,
+    spirv_execution_mode: *std.Build.Step.Compile,
+    execution_mode_fix_args: ?[]const []const u8,
 ) ShaderFiles {
-    var spirv = compileZigToSpirv(b, args.input, output_base_name);
-
-    // Remove duplicate type definitions that might be done by inline assembly along with optimize the SPIR-V.
-    if (b.findProgram(&.{"spirv-opt"}, &.{})) |spirv_opt| {
-        const spirv_fix = b.addSystemCommand(&.{ spirv_opt, "--remove-duplicates", "--skip-validation", "--trim-capabilities" });
-        spirv_fix.addFileArg(spirv);
-        spirv_fix.addArg("-o");
-        spirv = spirv_fix.addOutputFileArg(b.fmt("{s}-fixed.spv", .{output_base_name}));
-
-        // Optimize the SPIR-V.
-        const spirv_optimize = b.addSystemCommand(&.{ spirv_opt, "-O" });
-        spirv_optimize.addFileArg(spirv);
-        spirv_optimize.addArg("-o");
-        spirv = spirv_optimize.addOutputFileArg(b.fmt("{s}-optimized.spv", .{output_base_name}));
-    } else |_| {
-        std.debug.print("Unable to find spirv-opt is missing, expect unoptimal performance or bugs\n", .{});
-    }
+    const spirv = compileZigToSpirv(b, args.input, output_base_name, spirv_execution_mode, execution_mode_fix_args);
 
     return runShadercrossForFormats(b, .{
         .shadercross = args.shadercross,
@@ -572,6 +591,8 @@ pub fn compileZigForFormats(
 /// * `b`: The build system.
 /// * `input`: Path to the zig file to compile.
 /// * `name`: Name of the module.
+/// * `spirv_execution_mode`: SPIR-V execution mode commandline tool (can be undefined unless `execution_mode_fix_args` is set).
+/// * `execution_mode_fix_args`: Arguments needed for the execution mode tool to fix the assembly.
 ///
 /// ## Return Value
 /// Return the emitted SPIR-V binary file.
@@ -579,6 +600,8 @@ pub fn compileZigToSpirv(
     b: *std.Build,
     input: std.Build.LazyPath,
     name: []const u8,
+    spirv_execution_mode: *std.Build.Step.Compile,
+    execution_mode_fix_args: ?[]const []const u8,
 ) std.Build.LazyPath {
     const obj = b.addObject(.{
         .name = name,
@@ -595,7 +618,53 @@ pub fn compileZigToSpirv(
         .use_llvm = false,
         .use_lld = false,
     });
-    return obj.getEmittedBin();
+    var spirv = obj.getEmittedBin();
+
+    // Remove duplicate type definitions that might be done by inline assembly along with optimize the SPIR-V.
+    if (b.findProgram(&.{"spirv-opt"}, &.{})) |spirv_opt| {
+        const spirv_fix = b.addSystemCommand(&.{ spirv_opt, "--remove-duplicates", "--skip-validation", "--trim-capabilities" });
+        spirv_fix.addFileArg(spirv);
+        spirv_fix.addArg("-o");
+        spirv = spirv_fix.addOutputFileArg(b.fmt("{s}-fixed.spv", .{name}));
+
+        // Handle fixup.
+        if (execution_mode_fix_args) |fix_args| {
+            const spirv_dis = b.findProgram(&.{"spirv-dis"}, &.{}) catch @panic("Can not find spirv-dis");
+            const spirv_as = b.findProgram(&.{"spirv-as"}, &.{}) catch @panic("Can not find spirv-as");
+
+            // Disassemble into SPIRV assembly.
+            const spirv_dis_cmd = b.addSystemCommand(&.{spirv_dis});
+            spirv_dis_cmd.addFileArg(spirv);
+            spirv_dis_cmd.addArg("-o");
+            const spirv_dis_out = spirv_dis_cmd.addOutputFileArg(b.fmt("{s}.spvasm", .{name}));
+
+            // Modify the execution mode using a custom build tool.
+            const spirv_execution_mode_cmd = b.addRunArtifact(spirv_execution_mode);
+            spirv_execution_mode_cmd.addFileArg(spirv_dis_out);
+            const execution_mode_changed_spirv = spirv_execution_mode_cmd.addOutputFileArg(b.fmt("{s}-execution-mode-fixed.spvasm", .{name}));
+            spirv_execution_mode_cmd.addArgs(fix_args);
+
+            // Reassemble updated assembly.
+            const spirv_as_cmd = b.addSystemCommand(&.{spirv_as});
+            spirv_as_cmd.addFileArg(execution_mode_changed_spirv);
+            spirv_as_cmd.addArg("-o");
+            spirv = spirv_as_cmd.addOutputFileArg(b.fmt("{s}-execution-mode-fixed.spv", .{name}));
+        }
+
+        // Optimize the SPIR-V.
+        const spirv_optimize = b.addSystemCommand(&.{ spirv_opt, "-O" });
+        spirv_optimize.addFileArg(spirv);
+        spirv_optimize.addArg("-o");
+        spirv = spirv_optimize.addOutputFileArg(b.fmt("{s}-optimized.spv", .{name}));
+    } else |_| {
+        if (execution_mode_fix_args != null) {
+            @panic("Unable to set SPIR-V execution mode with spirv-tools installed");
+        } else {
+            std.debug.print("Unable to find spirv-opt is missing, expect unoptimal performance or bugs\n", .{});
+        }
+    }
+
+    return spirv;
 }
 
 /// Run SDL shadercross.

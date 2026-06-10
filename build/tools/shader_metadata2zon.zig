@@ -1,3 +1,4 @@
+const ComputePipelineMetadata = @import("ComputePipelineMetadata");
 const GraphicsShaderMetadata = @import("GraphicsShaderMetadata");
 const std = @import("std");
 
@@ -32,9 +33,6 @@ pub fn main(
     var input_file = try std.Io.Dir.cwd().openFile(init.io, args[2], .{});
     defer input_file.close(init.io);
 
-    if (!graphics)
-        @panic("Compute metadata not supported yet");
-
     var input_file_buffer: [file_buffer_size]u8 = undefined;
     var output_file_buffer: [file_buffer_size]u8 = undefined;
 
@@ -42,13 +40,23 @@ pub fn main(
     var input_file_json_reader = std.json.Reader.init(allocator, &input_file_reader.interface);
     defer input_file_json_reader.deinit();
 
-    const metadata = try std.json.parseFromTokenSourceLeaky(GraphicsShaderMetadata, allocator, &input_file_json_reader, .{});
+    var metadata_graphics: GraphicsShaderMetadata = undefined;
+    var metadata_compute: ComputePipelineMetadata = undefined;
+    if (graphics) {
+        metadata_graphics = try std.json.parseFromTokenSourceLeaky(GraphicsShaderMetadata, allocator, &input_file_json_reader, .{});
+    } else {
+        metadata_compute = try std.json.parseFromTokenSourceLeaky(ComputePipelineMetadata, allocator, &input_file_json_reader, .{});
+    }
 
     var output_file = try std.Io.Dir.cwd().createFile(init.io, args[3], .{});
     defer output_file.close(init.io);
 
     var output_file_writer = output_file.writer(init.io, &output_file_buffer);
 
-    try std.zon.stringify.serialize(metadata, .{}, &output_file_writer.interface);
+    if (graphics) {
+        try std.zon.stringify.serialize(metadata_graphics, .{}, &output_file_writer.interface);
+    } else {
+        try std.zon.stringify.serialize(metadata_compute, .{}, &output_file_writer.interface);
+    }
     try output_file_writer.interface.flush();
 }

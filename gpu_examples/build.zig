@@ -3,6 +3,7 @@ const std = @import("std");
 
 const examples = [_]Example{
     .{ "basic-triangle", &.{ "rawTriangle.vert", "solidColor.frag" } },
+    .{ "basic-compute", &.{ "texturedQuad.vert", "texturedQuad.frag", "fillTexture.comp" } },
     .{ "clear-screen", &.{} },
     .{ "textured-quad", &.{ "texturedQuad.vert", "texturedQuad.frag" } },
 };
@@ -13,7 +14,13 @@ const shaders = [_][]const u8{
 
     "solidColor.frag",
     "texturedQuad.frag",
+
+    "fillTexture.comp",
 };
+
+const zig_spirv_execution_mode_fix_args = std.StaticStringMap([]const []const u8).initComptime(.{
+    .{ "fillTexture.comp", &.{ "LocalSize", "8", "8", "1" } },
+});
 
 const Example = struct {
     []const u8, // Name.
@@ -34,6 +41,7 @@ fn compileShader(
     shader_format: ShaderFormat,
     name: []const u8,
     gpu_debug: bool,
+    spirv_execution_mode: *std.Build.Step.Compile,
 ) sdl3_build.shaders.ShaderFiles {
     const shader_formats = std.EnumSet(sdl3_build.shaders.ShadercrossFormat).initMany(&.{
         .dxil,
@@ -83,6 +91,8 @@ fn compileShader(
             shader_formats,
             name,
             write_files,
+            spirv_execution_mode,
+            if (zig_spirv_execution_mode_fix_args.get(name)) |val| val else null,
         ),
     };
 }
@@ -129,6 +139,7 @@ pub fn build(
 
     const shadercross = sdl3_build.shadercross.cli(sdl3.builder, null, true, true) orelse return;
     const shader_metadata2zon = sdl3_build.shaders.compileShaderMetadata2Zon(sdl3.builder);
+    const spirv_execution_mode = sdl3_build.shaders.compileSpirvExecutionMode(sdl3.builder);
     const write_files = b.addWriteFiles();
 
     var compiled_shaders = std.StringHashMap(sdl3_build.shaders.ShaderFiles).init(b.allocator);
@@ -142,6 +153,7 @@ pub fn build(
             shader_format,
             shader,
             gpu_debug,
+            spirv_execution_mode,
         ));
     }
 

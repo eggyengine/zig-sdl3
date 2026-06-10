@@ -22,10 +22,12 @@ const shader_formats = sdl3.gpu.ShaderFormatFlags{
 // Shaders.
 const vert_shader = @import("rawTriangle.vert.zig");
 const frag_shader = @import("solidColor.frag.zig");
+const vert_shader_metadata = sdl3.extras.gpu.getShaderMetadataField(vert_shader);
+const frag_shader_metadata = sdl3.extras.gpu.getShaderMetadataField(frag_shader);
 comptime {
     sdl3.extras.gpu.ensureCompatibleGraphicsShadersComptime(
-        sdl3.extras.gpu.getGraphicsShaderMetadata(vert_shader),
-        sdl3.extras.gpu.getGraphicsShaderMetadata(frag_shader),
+        vert_shader_metadata,
+        frag_shader_metadata,
     );
 }
 
