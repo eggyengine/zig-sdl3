@@ -622,7 +622,7 @@ pub fn compileZigToSpirv(
 
     // Remove duplicate type definitions that might be done by inline assembly along with optimize the SPIR-V.
     if (b.findProgram(&.{"spirv-opt"}, &.{})) |spirv_opt| {
-        const spirv_fix = b.addSystemCommand(&.{ spirv_opt, "--remove-duplicates", "--skip-validation", "--trim-capabilities" });
+        const spirv_fix = b.addSystemCommand(&.{ spirv_opt, "--remove-duplicates", "--skip-validation" });
         spirv_fix.addFileArg(spirv);
         spirv_fix.addArg("-o");
         spirv = spirv_fix.addOutputFileArg(b.fmt("{s}-fixed.spv", .{name}));
