@@ -20,7 +20,7 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Documentation
-        run: zig build docs -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+        run: zig build docs -Dtarget=x86_64-linux-gnu
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
