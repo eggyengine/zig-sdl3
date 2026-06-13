@@ -3808,3 +3808,8 @@ pub const SubString = struct {
         };
     }
 };
+
+// TTF testing.
+test "ttf" {
+    std.testing.refAllDecls(@This());
+}

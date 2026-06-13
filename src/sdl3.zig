@@ -2127,7 +2127,7 @@ test {
         _ = @import("misc.zig");
         _ = @import("mouse.zig");
         _ = @import("mutex.zig");
-        // _ = @import("net.zig");
+        _ = @import("net.zig");
         _ = @import("pen.zig");
         _ = @import("pixels.zig");
         _ = @import("platform.zig");
@@ -2138,7 +2138,7 @@ test {
         _ = @import("render.zig");
         _ = @import("scancode.zig");
         _ = @import("sensor.zig");
-        // _ = @import("shadercross.zig");
+        _ = @import("shadercross.zig");
         _ = @import("storage.zig");
         _ = @import("surface.zig");
         _ = @import("system.zig");
