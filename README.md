@@ -46,6 +46,8 @@ const sdl3 = b.dependency("sdl3", .{
     // Lib options.
     /// .ext_image = false,
     /// .ext_net = false,
+    /// .ext_shadercross = false,
+    /// .ext_shadercross_dxc = false,
     /// .ext_ttf = false,
     /// .log_message_stack_size = 1024,
     /// .main = false,
