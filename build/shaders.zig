@@ -108,6 +108,26 @@ pub const ShaderFiles = struct {
             file.value.addSource(b, zig_shim, write_files, file.key != .zon);
         module.addImport(b.fmt("{s}.zig", .{self.base_name}), zig_shim);
     }
+
+    /// Insall the shader files to a directory.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The shader files.
+    /// * `b`: The build system.
+    /// * `step`: The step to be dependent on.
+    /// * `dest_rel_path`: Path relative to the bin directory to install the shader at.
+    pub fn install(
+        self: *ShaderFiles,
+        b: *std.Build,
+        step: *std.Build.Step,
+        dest_rel_path: []const u8,
+    ) void {
+        var file_iter = self.files.iterator();
+        while (file_iter.next()) |file_entry| {
+            const install_file = b.addInstallBinFile(file_entry.value.data, b.fmt("{s}/{s}.{s}", .{ dest_rel_path, self.base_name, @tagName(file_entry.key) }));
+            step.dependOn(&install_file.step);
+        }
+    }
 };
 
 /// Shader metadata for a generated shader.
