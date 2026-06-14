@@ -1,24 +1,24 @@
+const ExtensionConfig = @import("ExtensionConfig.zig");
 const std = @import("std");
+
+/// Options for SDL net.
+pub const Options = struct {
+    shared: bool = false,
+};
 
 pub fn setup(
     b: *std.Build,
-    sdl3: *std.Build.Module,
-    translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: ?*std.Build.Step.Compile,
-    linkage: std.builtin.LinkMode,
-    cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
-    system_include_path: ?std.Build.LazyPath,
+    extension_config: ExtensionConfig,
+    options: Options,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
 ) void {
-    const target = cfg.target;
-    const optimize = cfg.optimize;
-
     const upstream = b.lazyDependency("sdl_net", .{}) orelse return;
     const native_os = target.result.os.tag;
 
     const lib_name = "SDL3_net";
     const version = std.SemanticVersion.parse("3.0.0") catch unreachable;
-    // Options.
-    const shared = b.option(bool, "shared", "Build SDL_net as a shared library") orelse false;
+
     // Library.
     const lib = b.addLibrary(.{
         .name = lib_name,
@@ -28,10 +28,10 @@ pub fn setup(
             .optimize = optimize,
             .link_libc = true,
         }),
-        .linkage = linkage,
+        .linkage = extension_config.linkage,
     });
 
-    if (system_include_path) |val| {
+    if (extension_config.system_include_path) |val| {
         lib.root_module.addSystemIncludePath(val);
     }
 
@@ -44,27 +44,27 @@ pub fn setup(
         .flags = lib_c_flags.items,
     });
     // Headers.
-    translate_c.addIncludePath(upstream.path("include"));
+    extension_config.translate_c.addIncludePath(upstream.path("include"));
     lib.root_module.addIncludePath(upstream.path("include"));
     // Defines.
     lib.root_module.addCMacro("BUILD_SDL", "1");
     lib.root_module.addCMacro("SDL_BUILD_MAJOR_VERSION", b.fmt("{d}", .{version.major}));
     lib.root_module.addCMacro("SDL_BUILD_MINOR_VERSION", b.fmt("{d}", .{version.minor}));
     lib.root_module.addCMacro("SDL_BUILD_MICRO_VERSION", b.fmt("{d}", .{version.patch}));
-    if (shared and native_os == .windows) {
+    if (options.shared and native_os == .windows) {
         lib.root_module.addCMacro("DLL_EXPORT", "");
     }
     if (native_os != .windows and native_os != .haiku) {
         lib.root_module.addCMacro("_DEFAULT_SOURCE", "");
     }
-    if (sdl_dep_lib) |sdl_lib| {
+    if (extension_config.sdl_dep_lib) |sdl_lib| {
         lib.root_module.linkLibrary(sdl_lib);
     } else lib.root_module.linkSystemLibrary("sdl3", .{});
     // Linking.
     if (native_os == .windows) {
         lib.root_module.linkSystemLibrary("iphlpapi", .{});
         lib.root_module.linkSystemLibrary("ws2_32", .{});
-        if (shared) {
+        if (options.shared) {
             lib.root_module.addWin32ResourceFile(.{ .file = upstream.path("src/version.rc") });
         }
     } else if (native_os == .haiku) {
@@ -74,7 +74,7 @@ pub fn setup(
     if (target.result.ofmt == .elf or target.result.ofmt == .macho) {
         lib.setVersionScript(upstream.path("src/SDL_net.sym"));
     }
-    if (shared) {
+    if (options.shared) {
         lib.linker_allow_shlib_undefined = false;
     }
 
@@ -85,6 +85,6 @@ pub fn setup(
     const install_license = b.addInstallFile(upstream.path("LICENSE.txt"), "share/licenses/SDL3_net/LICENSE.txt");
     b.getInstallStep().dependOn(&install_license.step);
 
-    sdl3.linkLibrary(lib);
-    sdl3.addIncludePath(upstream.path("include"));
+    extension_config.sdl3.linkLibrary(lib);
+    extension_config.sdl3.addIncludePath(upstream.path("include"));
 }

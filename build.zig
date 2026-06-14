@@ -7,6 +7,8 @@ pub const shadercross = @import("build/shadercross.zig");
 pub const shaders = @import("build/shaders.zig");
 pub const ttf = @import("build/ttf.zig");
 
+pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
+
 /// List of example programs to compile from the examples folder.
 const examples = [_][]const u8{
     "assert",
@@ -40,15 +42,15 @@ pub const SdlConfig = struct {
     /// If to use a special SDL main instead of a normal main.
     sdl3_main: bool = false,
     /// Enable the image extension.
-    ext_image: bool = false,
+    ext_image: ?image.Options = null,
     /// Enable the networking extension.
-    ext_net: bool = false,
+    ext_net: ?net.Options = null,
     /// Enable the shadercross extension.
-    ext_shadercross: bool = false,
+    ext_shadercross: ?shadercross.Options = null,
     /// Enable DXC support for shadercross.
     ext_shadercross_dxc: bool = false,
     /// Enable the true type font extension.
-    ext_ttf: bool = false,
+    ext_ttf: ?ttf.Options = null,
     /// How to link C SDL.
     c_sdl_preferred_linkage: std.builtin.LinkMode = .static,
     /// If to strip C SDL.
@@ -64,6 +66,16 @@ pub const SdlConfig = struct {
 };
 
 /// Prepare an SDL3 module.
+///
+/// ## Function Parameters
+/// * `b`: The build system.
+/// * `cfg`: SDL build configuration.
+/// * `target`: Target option.
+/// * `optimize` Optimization option.
+/// * `public`: If to export the SDL3 module publicly.
+///
+/// ## Return Value
+/// Returns the created SDL3 module.
 pub fn prepareSdl(
     b: *std.Build,
     cfg: SdlConfig,
@@ -83,10 +95,10 @@ pub fn prepareSdl(
         \\{s}
     , .{
         if (!cfg.sdl3_main) "#define SDL_MAIN_NOIMPL\n" else "",
-        if (cfg.ext_image) "#include <SDL3_image/SDL_image.h>\n" else "",
-        if (cfg.ext_net) "#include <SDL3_net/SDL_net.h>\n" else "",
-        if (cfg.ext_shadercross) "#include <SDL3_shadercross/SDL_shadercross.h>\n" else "",
-        if (cfg.ext_ttf) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
+        if (cfg.ext_image != null) "#include <SDL3_image/SDL_image.h>\n" else "",
+        if (cfg.ext_net != null) "#include <SDL3_net/SDL_net.h>\n" else "",
+        if (cfg.ext_shadercross != null) "#include <SDL3_shadercross/SDL_shadercross.h>\n" else "",
+        if (cfg.ext_ttf != null) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
     });
 
     const c_source_file_step = b.addWriteFiles();
@@ -163,30 +175,22 @@ pub fn prepareSdl(
 
     const ext_linkage = if (cfg.system_sdl) .dynamic else cfg.c_sdl_preferred_linkage;
 
-    if (cfg.ext_image) {
-        image.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
-            .optimize = optimize,
-            .target = target,
-        }, cfg.sdl_system_include_path);
-    }
-    if (cfg.ext_net) {
-        net.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
-            .optimize = optimize,
-            .target = target,
-        }, cfg.sdl_system_include_path);
-    }
-    if (cfg.ext_shadercross) {
-        shadercross.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
-            .optimize = optimize,
-            .target = target,
-        }, cfg.sdl_system_include_path, cfg.ext_shadercross_dxc);
-    }
-    if (cfg.ext_ttf) {
-        ttf.setup(b, sdl3, translate_c, sdl_dep_lib, ext_linkage, .{
-            .optimize = optimize,
-            .target = target,
-        }, cfg.sdl_system_include_path);
-    }
+    const extension_config = ExtensionConfig{
+        .linkage = ext_linkage,
+        .sdl3 = sdl3,
+        .sdl_dep_lib = sdl_dep_lib,
+        .system_include_path = cfg.sdl_system_include_path,
+        .translate_c = translate_c,
+    };
+
+    if (cfg.ext_image) |opts|
+        image.setup(b, extension_config, opts, target, optimize);
+    if (cfg.ext_net) |opts|
+        net.setup(b, extension_config, opts, target, optimize);
+    if (cfg.ext_shadercross) |opts|
+        shadercross.setup(b, extension_config, opts, target, optimize, cfg.ext_shadercross_dxc);
+    if (cfg.ext_ttf) |opts|
+        ttf.setup(b, extension_config, opts, target, optimize);
 
     return sdl3;
 }
@@ -224,6 +228,39 @@ pub fn build(
     const ext_shadercross_dxc = b.option(bool, "ext_shadercross_dxc", "Enable SDL_shadercross extension DXC support") orelse false;
     const ext_ttf = b.option(bool, "ext_ttf", "Enable SDL_ttf extension") orelse false;
 
+    // SDL image options.
+    var ext_image_opts = image.Options{};
+    if (ext_image) {
+        ext_image_opts.enable_bmp = b.option(bool, "image_enable_bmp", "Support loading BMP images") orelse true;
+        ext_image_opts.enable_gif = b.option(bool, "image_enable_gif", "Support loading GIF images") orelse true;
+        ext_image_opts.enable_jpg = b.option(bool, "image_enable_jpg", "Support loading JPEG images") orelse true;
+        ext_image_opts.enable_lbm = b.option(bool, "image_enable_lbm", "Support loading LBM images") orelse true;
+        ext_image_opts.enable_pcx = b.option(bool, "image_enable_pcx", "Support loading PCX images") orelse true;
+        ext_image_opts.enable_png = b.option(bool, "image_enable_png", "Support loading PNG images") orelse true;
+        ext_image_opts.enable_pnm = b.option(bool, "image_enable_pnm", "Support loading PNM images") orelse true;
+        ext_image_opts.enable_qoi = b.option(bool, "image_enable_qoi", "Support loading QOI images") orelse true;
+        ext_image_opts.enable_svg = b.option(bool, "image_enable_svg", "Support loading SVG images") orelse true;
+        ext_image_opts.enable_tga = b.option(bool, "image_enable_tga", "Support loading TGA images") orelse true;
+        ext_image_opts.enable_xcf = b.option(bool, "image_enable_xcf", "Support loading XCF images") orelse true;
+        ext_image_opts.enable_xpm = b.option(bool, "image_enable_xpm", "Support loading XPM images") orelse true;
+        ext_image_opts.enable_xv = b.option(bool, "image_enable_xv", "Support loading XV images") orelse true;
+    }
+
+    // SDL net options.
+    var ext_net_opts = net.Options{};
+    if (ext_net) {
+        ext_net_opts.shared = b.option(bool, "shared", "Build SDL_net as a shared library") orelse false;
+    }
+
+    // SDL shadercross options.
+    const ext_shadercross_opts = shadercross.Options{};
+
+    // SDL TTF options.
+    var ext_ttf_opts = ttf.Options{};
+    if (ext_ttf) {
+        ext_ttf_opts.enable_harfbuzz = b.option(bool, "enable-harfbuzz", "Use HarfBuzz to improve text shaping") orelse true;
+    }
+
     var sdl_config = SdlConfig{
         .c_sdl_emscripten_pthreads = c_sdl_emscripten_pthreads,
         .c_sdl_install_build_config_h = c_sdl_install_build_config_h,
@@ -231,11 +268,11 @@ pub fn build(
         .c_sdl_preferred_linkage = c_sdl_preferred_linkage,
         .c_sdl_sanitize_c = c_sdl_sanitize_c,
         .c_sdl_strip = c_sdl_strip,
-        .ext_image = ext_image,
-        .ext_net = ext_net,
-        .ext_shadercross = ext_shadercross,
+        .ext_image = if (ext_image) ext_image_opts else null,
+        .ext_net = if (ext_net) ext_net_opts else null,
+        .ext_shadercross = if (ext_shadercross) ext_shadercross_opts else null,
         .ext_shadercross_dxc = ext_shadercross_dxc,
-        .ext_ttf = ext_ttf,
+        .ext_ttf = if (ext_ttf) ext_ttf_opts else null,
         .log_message_stack_size = log_message_stack_size,
         .renderer_debug_text_stack_size = renderer_debug_text_stack_size,
         .sdl3_main = sdl3_main,
@@ -243,10 +280,10 @@ pub fn build(
         .system_sdl = system_sdl,
     };
     _ = prepareSdl(b, sdl_config, target, optimize, true);
-    sdl_config.ext_image = true;
-    sdl_config.ext_net = true;
-    sdl_config.ext_shadercross = true;
-    sdl_config.ext_ttf = true;
+    sdl_config.ext_image = ext_image_opts;
+    sdl_config.ext_net = ext_net_opts;
+    sdl_config.ext_shadercross = ext_shadercross_opts;
+    sdl_config.ext_ttf = ext_ttf_opts;
     const sdl3_full = prepareSdl(b, sdl_config, target, optimize, false);
 
     setupDocs(b, sdl3_full);
@@ -254,7 +291,7 @@ pub fn build(
     setupTest(b, sdl3_full);
 }
 
-pub fn setupDocs(
+fn setupDocs(
     b: *std.Build,
     sdl3: *std.Build.Module,
 ) void {
@@ -271,7 +308,7 @@ pub fn setupDocs(
     docs_step.dependOn(&docs.step);
 }
 
-pub fn setupExample(
+fn setupExample(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
@@ -296,7 +333,7 @@ pub fn setupExample(
     return .{ exe, example_install };
 }
 
-pub fn runExample(
+fn runExample(
     b: *std.Build,
     example_compile: *std.Build.Step.Compile,
     example_install: *std.Build.Step.InstallArtifact,
@@ -307,7 +344,7 @@ pub fn runExample(
     run_examples_step.dependOn(&run_art.step);
 }
 
-pub fn setupExamples(
+fn setupExamples(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
@@ -334,7 +371,7 @@ pub fn setupExamples(
     }
 }
 
-pub fn setupTest(
+fn setupTest(
     b: *std.Build,
     sdl3: *std.Build.Module,
 ) void {

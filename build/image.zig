@@ -1,32 +1,47 @@
+const ExtensionConfig = @import("ExtensionConfig.zig");
 const std = @import("std");
+
+/// Options for SDL image.
+pub const Options = struct {
+    enable_bmp: bool = true,
+    enable_gif: bool = true,
+    enable_jpg: bool = true,
+    enable_lbm: bool = true,
+    enable_pcx: bool = true,
+    enable_png: bool = true,
+    enable_pnm: bool = true,
+    enable_qoi: bool = true,
+    enable_svg: bool = true,
+    enable_tga: bool = true,
+    enable_xcf: bool = true,
+    enable_xpm: bool = true,
+    enable_xv: bool = true,
+};
 
 // Most of this is copied from https://github.com/allyourcodebase/SDL_image/blob/main/build.zig.
 pub fn setup(
     b: *std.Build,
-    sdl3: *std.Build.Module,
-    translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: ?*std.Build.Step.Compile,
-    linkage: std.builtin.LinkMode,
-    cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
-    system_include_path: ?std.Build.LazyPath,
+    extension_config: ExtensionConfig,
+    options: Options,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
 ) void {
     const upstream = b.lazyDependency("sdl_image", .{}) orelse return;
 
-    const target = cfg.target;
     const lib = b.addLibrary(.{
         .name = "SDL3_image",
         .version = .{ .major = 3, .minor = 2, .patch = 4 },
-        .linkage = linkage,
+        .linkage = extension_config.linkage,
         .root_module = b.createModule(.{
             .target = target,
-            .optimize = cfg.optimize,
+            .optimize = optimize,
             .link_libc = true,
         }),
     });
-    if (system_include_path) |val| {
+    if (extension_config.system_include_path) |val| {
         lib.root_module.addSystemIncludePath(val);
     }
-    if (sdl_dep_lib) |sdl_lib| {
+    if (extension_config.sdl_dep_lib) |sdl_lib| {
         lib.root_module.linkLibrary(sdl_lib);
     } else lib.root_module.linkSystemLibrary("sdl3", .{});
 
@@ -38,34 +53,34 @@ pub fn setup(
     // The following are options for supported file formats. AVIF, JXL, TIFF,
     // and WebP are not yet supported by this build script, as they require
     // additional dependencies.
-    if (b.option(bool, "image_enable_bmp", "Support loading BMP images") orelse true)
+    if (options.enable_bmp)
         lib.root_module.addCMacro("LOAD_BMP", "");
-    if (b.option(bool, "image_enable_gif", "Support loading GIF images") orelse true)
+    if (options.enable_gif)
         lib.root_module.addCMacro("LOAD_GIF", "");
-    if (b.option(bool, "image_enable_jpg", "Support loading JPEG images") orelse true)
+    if (options.enable_jpg)
         lib.root_module.addCMacro("LOAD_JPG", "");
-    if (b.option(bool, "image_enable_lbm", "Support loading LBM images") orelse true)
+    if (options.enable_lbm)
         lib.root_module.addCMacro("LOAD_LBM", "");
-    if (b.option(bool, "image_enable_pcx", "Support loading PCX images") orelse true)
+    if (options.enable_pcx)
         lib.root_module.addCMacro("LOAD_PCX", "");
-    if (b.option(bool, "image_enable_png", "Support loading PNG images") orelse true)
+    if (options.enable_png)
         lib.root_module.addCMacro("LOAD_PNG", "");
-    if (b.option(bool, "image_enable_pnm", "Support loading PNM images") orelse true)
+    if (options.enable_pnm)
         lib.root_module.addCMacro("LOAD_PNM", "");
-    if (b.option(bool, "image_enable_qoi", "Support loading QOI images") orelse true)
+    if (options.enable_qoi)
         lib.root_module.addCMacro("LOAD_QOI", "");
-    if (b.option(bool, "image_enable_svg", "Support loading SVG images") orelse true)
+    if (options.enable_svg)
         lib.root_module.addCMacro("LOAD_SVG", "");
-    if (b.option(bool, "image_enable_tga", "Support loading TGA images") orelse true)
+    if (options.enable_tga)
         lib.root_module.addCMacro("LOAD_TGA", "");
-    if (b.option(bool, "image_enable_xcf", "Support loading XCF images") orelse true)
+    if (options.enable_xcf)
         lib.root_module.addCMacro("LOAD_XCF", "");
-    if (b.option(bool, "image_enable_xpm", "Support loading XPM images") orelse true)
+    if (options.enable_xpm)
         lib.root_module.addCMacro("LOAD_XPM", "");
-    if (b.option(bool, "image_enable_xv", "Support loading XV images") orelse true)
+    if (options.enable_xv)
         lib.root_module.addCMacro("LOAD_XV", "");
 
-    translate_c.addIncludePath(upstream.path("include"));
+    extension_config.translate_c.addIncludePath(upstream.path("include"));
     lib.root_module.addIncludePath(upstream.path("include"));
     lib.root_module.addIncludePath(upstream.path("src"));
 
@@ -105,5 +120,5 @@ pub fn setup(
 
     lib.installHeadersDirectory(upstream.path("include"), "", .{});
 
-    sdl3.linkLibrary(lib);
+    extension_config.sdl3.linkLibrary(lib);
 }
