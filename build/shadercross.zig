@@ -1,4 +1,8 @@
+const ExtensionConfig = @import("ExtensionConfig.zig");
 const std = @import("std");
+
+/// Options for SDL shadercross.
+pub const Options = struct {};
 
 // Most of this is copied from https://github.com/Beyley/SDL_shadercross_zig/blob/master/build.zig.
 fn addDeps(
@@ -89,33 +93,32 @@ pub fn cli(
 
 pub fn setup(
     b: *std.Build,
-    sdl3: *std.Build.Module,
-    translate_c: *std.Build.Step.TranslateC,
-    sdl_dep_lib: ?*std.Build.Step.Compile,
-    linkage: std.builtin.LinkMode,
-    cfg: struct { optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget },
-    system_include_path: ?std.Build.LazyPath,
+    extension_config: ExtensionConfig,
+    options: Options,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
     dxc_support: bool,
 ) void {
+    _ = options;
+
     const upstream = b.lazyDependency("sdl_shadercross", .{}) orelse return;
 
-    const target = cfg.target;
     const lib = b.addLibrary(.{
         .name = "SDL3_shadercross",
         .version = .{ .major = 3, .minor = 0, .patch = 0 },
-        .linkage = linkage,
+        .linkage = extension_config.linkage,
         .root_module = b.createModule(.{
             .target = target,
-            .optimize = cfg.optimize,
+            .optimize = optimize,
             .link_libc = true,
         }),
     });
-    if (addDeps(b, target, cfg.optimize, system_include_path, sdl_dep_lib, false, dxc_support, lib) == null)
+    if (addDeps(b, target, optimize, extension_config.system_include_path, extension_config.sdl_dep_lib, false, dxc_support, lib) == null)
         return;
 
-    translate_c.addIncludePath(upstream.path("include"));
+    extension_config.translate_c.addIncludePath(upstream.path("include"));
     lib.root_module.addIncludePath(upstream.path("include"));
     lib.root_module.addIncludePath(upstream.path("src"));
 
-    sdl3.linkLibrary(lib);
+    extension_config.sdl3.linkLibrary(lib);
 }

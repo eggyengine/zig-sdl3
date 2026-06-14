@@ -23,9 +23,9 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Documentation Linux
-        run: zig build docs -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+        run: zig build docs -Dtarget=x86_64-linux-gnu
       - name: Build Documentation Windows
-        run: zig build docs -Dtarget=x86_64-windows -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+        run: zig build docs -Dtarget=x86_64-windows
   examples:
     name: Build Examples
     runs-on: docker
@@ -35,9 +35,9 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Build Examples Linux
-        run: zig build examples -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+        run: zig build examples -Dtarget=x86_64-linux-gnu
       - name: Build Examples Windows
-        run: zig build examples -Dtarget=x86_64-windows -Dext_image=true -Dext_net=true -Dext_ttf=true -Dext_shadercross=true
+        run: zig build examples -Dtarget=x86_64-windows
   gpu_examples:
     name: Build GPU Examples
     runs-on: docker
@@ -125,6 +125,6 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Testing Linux
-        run: zig build test -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_ttf=true -Dext_net=true -Dext_shadercross=true
+        run: zig build test -Dtarget=x86_64-linux-gnu
       - name: Testing Windows
-        run: zig build test -Dtarget=x86_64-linux-gnu -Dext_image=true -Dext_ttf=true -Dext_net=true -Dext_shadercross=true -fwine
+        run: zig build test -Dtarget=x86_64-linux-gnu -fwine
