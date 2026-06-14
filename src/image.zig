@@ -19,7 +19,7 @@ comptime {
 /// ## Version
 /// This struct is available since SDL image 3.0.0.
 pub const Animation = struct {
-    value: c.IMG_Animation,
+    value: *c.IMG_Animation,
 
     /// Dispose of an animation and free its resources.
     ///
@@ -796,9 +796,9 @@ pub const Version = struct {
         micro: u32,
     ) Version {
         const ret = c.SDL_VERSIONNUM(
-            @intCast(major),
-            @intCast(minor),
-            @intCast(micro),
+            @as(c_int, @intCast(major)),
+            @as(c_int, @intCast(minor)),
+            @as(c_int, @intCast(micro)),
         );
         return Version{ .value = ret };
     }
@@ -840,9 +840,9 @@ pub const Version = struct {
         micro: u32,
     ) bool {
         const ret = c.SDL_IMAGE_VERSION_ATLEAST(
-            @intCast(major),
-            @intCast(minor),
-            @intCast(micro),
+            major,
+            minor,
+            micro,
         );
         return ret;
     }
@@ -1138,7 +1138,7 @@ pub fn loadXvIo(
 pub fn loadWebpIo(
     source: io_stream.Stream,
 ) !surface.Surface {
-    const ret = c.IMG_LoadWebp_IO(
+    const ret = c.IMG_LoadWEBP_IO(
         source.value,
     );
     if (ret == null)
@@ -1164,10 +1164,10 @@ pub fn loadSizedSvgIo(
 
 /// Load an XPM image from a memory array.
 pub fn readXpmFromArray(
-    xpm: [:0][:0]const u8,
+    xpm: [:null]const ?[*:0]const u8,
 ) !surface.Surface {
     const ret = c.IMG_ReadXPMFromArray(
-        xpm.ptr,
+        @ptrCast(@constCast(xpm.ptr)),
     );
     if (ret == null)
         return error.SdlError;
@@ -1176,10 +1176,10 @@ pub fn readXpmFromArray(
 
 /// Load an XPM image from a memory array.
 pub fn readXpmFromArrayToRgb8888(
-    xpm: [:0][:0]const u8,
+    xpm: [:null]const ?[*:0]const u8,
 ) !surface.Surface {
     const ret = c.IMG_ReadXPMFromArrayToRGB888(
-        xpm.ptr,
+        @ptrCast(@constCast(xpm.ptr)),
     );
     if (ret == null)
         return error.SdlError;
@@ -1276,4 +1276,8 @@ pub fn saveJpgIo(
     );
     if (!ret)
         return error.SdlError;
+}
+
+test "Image" {
+    errors.refAllDeclsRecursive(@This());
 }

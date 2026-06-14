@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// A type representing an atomic integer value.
@@ -519,5 +520,5 @@ pub fn setPointer(
 
 // Atomic testing.
 test "Atomic" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

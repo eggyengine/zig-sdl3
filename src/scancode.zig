@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// The SDL keyboard scancode representation.
@@ -450,5 +451,5 @@ pub const Scancode = enum(c.SDL_Scancode) {
 
 // Scancode tests.
 test "Scancode" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

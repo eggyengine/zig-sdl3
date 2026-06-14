@@ -569,5 +569,5 @@ pub fn transpileHlslFromSpirv(
 
 // Shadercross testing.
 test "shadercross" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

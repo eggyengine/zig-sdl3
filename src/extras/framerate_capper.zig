@@ -1,3 +1,4 @@
+const errors = @import("../errors.zig");
 const std = @import("std");
 const timer = @import("../timer.zig");
 
@@ -99,6 +100,6 @@ pub fn FramerateCapper(
     };
 }
 
-test "framerate capper" {
-    std.testing.refAllDecls(@This());
+test "extras framerate capper" {
+    errors.refAllDeclsRecursive(@This());
 }

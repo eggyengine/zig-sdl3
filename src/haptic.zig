@@ -1428,5 +1428,5 @@ pub fn isMouseHaptic() bool {
 
 // Haptic tests.
 test "Haptic" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

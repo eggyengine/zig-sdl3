@@ -448,7 +448,7 @@ fn testAssertCallback(assert_data: AssertData, user_data: ?*TestHandlerCallbackD
 
 // Test asserting functionality.
 test "Assert" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const handler, const user_data = getHandler();
     try std.testing.expectEqual(getDefaultHandler(), handler);

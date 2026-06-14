@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// Functionality to query the current SDL version, both as headers the app was compiled against, and a library the app is linked to.
@@ -169,7 +170,7 @@ pub const Version = packed struct {
 
 // Test version functionality.
 test "Version" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     try std.testing.expectEqual(true, Version.getRevision() != null);
     try std.testing.expectEqual(true, Version.atLeast(3, 0, 1));

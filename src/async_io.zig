@@ -122,7 +122,7 @@ pub const Outcome = struct {
             .file = .{ .value = value.asyncio.? },
             .task_type = @enumFromInt(value.type),
             .result = @enumFromInt(value.result),
-            .buffer = @as([*]u8, @alignCast(@ptrCast(value.buffer.?)))[0..@intCast(value.bytes_transferred)],
+            .buffer = @as([*]u8, @ptrCast(@alignCast(value.buffer.?)))[0..@intCast(value.bytes_transferred)],
             .offset = @intCast(value.offset),
             .bytes_requested = @intCast(value.bytes_requested),
             .user_data = value.userdata,
@@ -509,5 +509,5 @@ pub const TaskType = enum(c.SDL_AsyncIOTaskType) {
 
 // Test asynchronous IO.
 test "Async IO" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

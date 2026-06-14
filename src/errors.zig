@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const c = @import("c");
 const extras = @import("extras.zig");
 const std = @import("std");
@@ -122,6 +123,21 @@ pub fn get() ?[:0]const u8 {
     if (std.mem.eql(u8, converted_ret, ""))
         return null;
     return converted_ret;
+}
+
+/// Given a type, recursively references all the declarations inside, so that the semantic analyzer sees them.
+/// For deep types, you may use `@setEvalBranchQuota`.
+pub fn refAllDeclsRecursive(comptime T: type) void {
+    if (!builtin.is_test) return;
+    inline for (comptime std.meta.declarations(T)) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
 }
 
 /// Set the SDL error message for the current thread.
@@ -343,7 +359,7 @@ pub fn wrapCallNull(
 
 // Make sure error getting and setting works properly.
 test "Error" {
-    std.testing.refAllDecls(@This());
+    refAllDeclsRecursive(@This());
 
     clear();
     callErrorCallback();

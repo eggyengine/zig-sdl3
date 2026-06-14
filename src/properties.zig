@@ -464,7 +464,7 @@ fn testEnumeratePropertiesCb(user_data: ?*void, props: Group, name: [:0]const u8
 
 // Test out properties.
 test "Properties" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     _ = try getGlobal();
     const group = try Group.init();

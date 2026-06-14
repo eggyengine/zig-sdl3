@@ -187,8 +187,8 @@ pub const Address = extern struct {
     ///
     /// ## Version
     /// This function is available since SDL_net 3.0.0.
-    pub fn ref(self: Address) Address {
-        return .{ .value = c.NET_RefAddress(self.value) };
+    pub fn ref(self: Address) !Address {
+        return .{ .value = try errors.wrapCallNull(*c.NET_Address, c.NET_RefAddress(self.value)) };
     }
 
     /// Block until an address is resolved.
@@ -301,7 +301,7 @@ pub fn simulateAddressResolutionLoss(percent_loss: u8) void {
 /// ## Version
 /// This struct is provided by zig-sdl3.
 pub const LocalAddressList = struct {
-    slice: []const Address,
+    slice: []Address,
 
     /// Free the list of local addresses.
     ///
@@ -335,7 +335,7 @@ pub fn getLocalAddresses() Error!LocalAddressList {
         return error.SdlNetError;
     }
 
-    return .{ .slice = @as([*]const Address, @ptrCast(addresses_c))[0..@intCast(num_addresses)] };
+    return .{ .slice = @as([*]Address, @ptrCast(addresses_c))[0..@intCast(num_addresses)] };
 }
 
 /// An object that represents a streaming connection to another system.
@@ -657,7 +657,7 @@ pub const Datagram = struct {
     /// ## Remarks
     /// The returned address is owned by the datagram. If you want to keep it after `deinit()`ing the datagram, you must `ref()` it.
     pub fn getAddress(self: Datagram) Address {
-        return .{ .value = self.value.addr };
+        return .{ .value = self.value.addr.? };
     }
 
     /// Get the port of the sender.
@@ -841,5 +841,5 @@ pub fn waitUntilInputAvailable(allocator: std.mem.Allocator, sockets: []const Po
 }
 
 test "net" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

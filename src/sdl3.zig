@@ -2130,7 +2130,7 @@ test {
         _ = @import("message_box.zig");
         _ = @import("metal.zig");
         _ = @import("misc.zig");
-        // _ = @import("mixer.zig");
+        _ = @import("mixer.zig");
         _ = @import("mouse.zig");
         _ = @import("mutex.zig");
         _ = @import("net.zig");

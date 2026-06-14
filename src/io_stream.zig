@@ -2229,7 +2229,7 @@ fn testStreamSize(reader: ?*std.Io.Reader, writer: ?*std.Io.Writer, user_data: u
 
 // Stream tests.
 test "Stream" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const io = std.testing.io;
 

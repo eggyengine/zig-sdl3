@@ -620,5 +620,5 @@ pub fn init() !void {
 
 // Testing for the HID API.
 test "HID API" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

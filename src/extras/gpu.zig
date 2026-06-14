@@ -1,3 +1,4 @@
+const errors = @import("../errors.zig");
 const gpu = @import("../gpu.zig");
 const log = @import("../log.zig");
 const std = @import("std");
@@ -663,5 +664,5 @@ pub fn vertexBufferTypes(
 // }
 
 test "extras gpu" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

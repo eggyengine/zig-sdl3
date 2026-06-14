@@ -10,163 +10,146 @@ comptime {
         @compileError("The ext_mixer feature is either not enabled or not working!");
 }
 
-/// SDL_mixer version information.
-pub const Version = struct {
-    value: c_int,
-    /// SDL_mixer version compiled against.
-    pub const compiled_against = Version{ .value = c.SDL_MIXER_VERSION };
-
-    /// Create an SDL_mixer version number.
-    pub fn make(
-        major: u32,
-        minor: u32,
-        micro: u32,
-    ) Version {
-        const ret = c.SDL_VERSIONNUM(
-            @intCast(major),
-            @intCast(minor),
-            @intCast(micro),
-        );
-        return Version{ .value = ret };
-    }
-
-    /// Major version number.
-    pub fn getMajor(
-        self: Version,
-    ) u32 {
-        const ret = c.SDL_VERSIONNUM_MAJOR(
-            self.value,
-        );
-        return @intCast(ret);
-    }
-
-    /// Minor version number.
-    pub fn getMinor(
-        self: Version,
-    ) u32 {
-        const ret = c.SDL_VERSIONNUM_MINOR(
-            self.value,
-        );
-        return @intCast(ret);
-    }
-
-    /// Micro version number.
-    pub fn getMicro(
-        self: Version,
-    ) u32 {
-        const ret = c.SDL_VERSIONNUM_MICRO(
-            self.value,
-        );
-        return @intCast(ret);
-    }
-
-    /// Check if the SDL_mixer version is at least greater than the given one.
-    pub fn atLeast(
-        major: u32,
-        minor: u32,
-        micro: u32,
-    ) bool {
-        const ret = c.SDL_MIXER_VERSION_ATLEAST(
-            @intCast(major),
-            @intCast(minor),
-            @intCast(micro),
-        );
-        return ret;
-    }
-
-    /// Get the version of SDL_mixer that is linked against your program. Possibly different than the compiled against version.
-    pub fn get() Version {
-        const ret = c.MIX_Version();
-        return Version{ .value = ret };
-    }
-};
-
-/// Initialize the SDL_mixer library.
+/// A callback that fires when a `Group` has completed mixing.
+///
+/// ## Function Parameters
+/// * `user_data`: User data for personal use.
+/// * `group`: The group that is being mixed.
+/// * `spec`: The format of the data in `pcm`.
+/// * `pcm`: The raw PCM data in `f32` format.
 ///
 /// ## Remarks
-/// This must be successfully called once before (almost) any other SDL_mixer function can be used.
-/// It is safe to call this multiple times; the library will only initialize once, and won't deinitialize until `mixer.quit()` has been called a matching number of times.
-/// Extra attempts to init report success.
+/// This callback is fired when a mixing group has finished mixing: all tracks in the group have mixed into a single buffer and are prepared to be mixed
+/// into all other groups for the final mix output.
 ///
-/// ## Thread Safety
-/// It is safe to call this function from any thread.
+/// The audio data passed through here is not const data; the app is permitted to change it in any way it likes, and those changes will propagate through the mixing pipeline.
 ///
-/// ## Version
-/// This function is available since SDL_mixer 3.0.0.
-pub fn init() !void {
-    const ret = c.MIX_Init();
-    return errors.wrapCallBool(ret);
-}
-
-/// Deinitialize the SDL_mixer library.
+/// An audiospec is provided.
+/// Different groups might be in different formats, and an app needs to be able to handle that,
+/// but SDL mixer always does its mixing work in 32-bit float samples, even if the inputs or final output are not floating point.
+/// As such, `spec.format` will always be `floating_32_bit` and pcm hardcoded to be a float pointer.
 ///
-/// ## Remarks
-/// This must be called when done with the library, probably at the end of your program.
-/// It is safe to call this multiple times; the library will only deinitialize once, when this function is called the same number of times as `mixer.init()` was successfully called.
-/// Once you have successfully deinitialized the library, it is safe to call `mixer.init()` to reinitialize it for further use.
-///
-/// ## Thread Safety
-/// It is safe to call this function from any thread.
-///
-/// ## Version
-/// This function is available since SDL_mixer 3.0.0.
-pub fn quit() void {
-    c.MIX_Quit();
-}
-
-/// Options that control how a track begins playing.
-///
-/// ## Remarks
-/// All fields are optional; a `null` field uses SDL_mixer's default behavior for that setting.
-/// This maps to the `MIX_PROP_PLAY_*` properties that `Track.play()` accepts.
-///
-/// ## Version
-/// This type is provided by zig-sdl3.
-pub const PlayOptions = struct {
-    /// Number of times to loop the track after the first play, or `-1` to loop forever.
-    loops: ?i64 = null,
-    /// Fade the track in over this many milliseconds.
-    fade_in_milliseconds: ?i64 = null,
-    /// Start playback this many milliseconds into the audio.
-    start_millisecond: ?i64 = null,
-    /// Stop playback after this many milliseconds have been mixed.
-    max_milliseconds: ?i64 = null,
-
-    /// Convert to an SDL properties group.
-    pub fn toProperties(
-        self: PlayOptions,
-    ) !properties.Group {
-        const ret = try properties.Group.init();
-        if (self.loops) |val| try ret.set(
-            c.MIX_PROP_PLAY_LOOPS_NUMBER,
-            .{ .number = val },
-        );
-        if (self.fade_in_milliseconds) |val| try ret.set(
-            c.MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER,
-            .{ .number = val },
-        );
-        if (self.start_millisecond) |val| try ret.set(
-            c.MIX_PROP_PLAY_START_MILLISECOND_NUMBER,
-            .{ .number = val },
-        );
-        if (self.max_milliseconds) |val| try ret.set(
-            c.MIX_PROP_PLAY_MAX_MILLISECONDS_NUMBER,
-            .{ .number = val },
-        );
-        return ret;
-    }
-};
-
-/// Static audio data that can be assigned to one or more tracks for playback.
-///
-/// ## Remarks
-/// This is an opaque datatype, to be treated by the app as a handle.
-/// An audio object holds the decoded (or to-be-decoded) sound data;
-/// assign it to a `mixer.Track` to actually play it.
+/// The `samples` is the number of float values pointed to by pcm: samples, not sample frames!
+/// There are no promises how many samples will be provided per-callback, and this number can vary wildly from call to call, depending on many factors.
 ///
 /// ## Version
 /// This datatype is available since SDL_mixer 3.0.0.
-pub const Audio = struct {
+pub fn GroupMixCallback(comptime UserData: type) type {
+    return *const fn (
+        user_data: ?*UserData,
+        group: Group,
+        spec: audio.Spec,
+        pcm: []f32,
+    ) void;
+}
+
+/// A callback that fires when all mixing has completed.
+///
+/// ## Function Parameters
+/// * `user_data`: User data for personal use.
+/// * `mixer`: The mixer that is generating audio.
+/// * `spec`: The format of the data in `pcm`.
+/// * `pcm`: The raw PCM data in `f32` format.
+///
+/// ## Remarks
+/// This callback is fired when the mixer has completed all its work.
+/// If this mixer was created with `Mixer.initDevice`, the data provided by this callback is what is being sent to the audio hardware,
+/// minus last conversions for format requirements.
+/// If this mixer was created with `Mixer.init`, this is what is being output from `Mixer.generate`, after final conversions.
+///
+/// The audio data passed through here is not const data; the app is permitted to change it in any way it likes, and those changes will replace the final mixer pipeline output.
+///
+/// An audiospec is provided.
+/// Different groups might be in different formats, and an app needs to be able to handle that,
+/// but SDL mixer always does its mixing work in 32-bit float samples, even if the inputs or final output are not floating point.
+/// As such, `spec.format` will always be `floating_32_bit` and pcm hardcoded to be a float pointer.
+///
+/// The `samples` is the number of float values pointed to by pcm: samples, not sample frames!
+/// There are no promises how many samples will be provided per-callback, and this number can vary wildly from call to call, depending on many factors.
+///
+/// ## Version
+/// This datatype is available since SDL_mixer 3.0.0.
+pub fn PostMixCallback(comptime UserData: type) type {
+    return *const fn (
+        user_data: ?*UserData,
+        mixer: Mixer,
+        spec: audio.Spec,
+        pcm: []f32,
+    ) void;
+}
+
+/// A callback that fires when a track is mixing at various stages.
+///
+/// ## Function Parameters
+/// * `user_data`: User data for personal use.
+/// * `track`: The track that is being mixed.
+/// * `spec`: The format of the data in `pcm`.
+/// * `pcm`: The raw PCM data in `f32` format.
+///
+/// ## Remarks
+/// This callback is fired for different parts of the mixing pipeline, and gives the app visbility into the audio data that is being generated at various stages.
+///
+/// The audio data passed through here is not const data; the app is permitted to change it in any way it likes, and those changes will propagate through the mixing pipeline.
+///
+/// An audiospec is provided.
+/// Different groups might be in different formats, and an app needs to be able to handle that,
+/// but SDL mixer always does its mixing work in 32-bit float samples, even if the inputs or final output are not floating point.
+/// As such, `spec.format` will always be `floating_32_bit` and pcm hardcoded to be a float pointer.
+///
+/// The `samples` is the number of float values pointed to by pcm: samples, not sample frames!
+/// There are no promises how many samples will be provided per-callback, and this number can vary wildly from call to call, depending on many factors.
+///
+/// Making changes to the track during this callback is undefined behavior.
+/// Change the data in pcm but not the track itself.
+///
+/// ## Version
+/// This datatype is available since SDL_mixer 3.0.0.
+pub fn TrackMixCallback(comptime UserData: type) type {
+    return *const fn (
+        user_data: ?*UserData,
+        track: Track,
+        spec: audio.Spec,
+        pcm: []f32,
+    ) void;
+}
+
+/// A callback that fires when a MIX Track is stopped.
+///
+/// ## Function Parameters
+/// * `user_data`: User data for personal use.
+/// * `track`: The track that has stopped.
+///
+/// ## Remarks
+/// This callback is fired when a track completes playback, either because it ran out of data to mix (and all loops were completed as well), or it was explicitly stopped by the app.
+/// Pausing a track will not fire this callback.
+///
+/// It is legal to adjust the track, including changing its input and restarting it.
+/// If this is done because it ran out of data in the middle of mixing, the mixer will start mixing the new track state in its current run without any gap in the audio.
+///
+/// This callback will not fire when a playing track is destroyed.
+///
+/// ## Version
+/// This datatype is available since SDL_mixer 3.0.0.
+pub fn TrackStoppedCallback(comptime UserData: type) type {
+    return *const fn (
+        user_data: ?*UserData,
+        track: Track,
+    ) void;
+}
+
+/// An opaque object that represents audio data.
+///
+/// ## Remarks
+/// Generally you load audio data (in whatever file format) into SDL_mixer with `Audio.load` or one of its several variants, producing an `Audio` object.
+///
+/// An `Audio` represents static audio data; it could be background music, or maybe a laser gun sound effect.
+/// It is loaded into RAM and can be played multiple times, possibly on different tracks at the same time.
+///
+/// Unlike most other objects, `Audio` objects can be shared between mixers.
+///
+/// ## Version
+/// This datatype is available since SDL_mixer 3.0.0.
+pub const Audio = extern struct {
     value: *c.MIX_Audio,
 
     /// Dispose of a previously-loaded audio object.
@@ -188,6 +171,32 @@ pub const Audio = struct {
         c.MIX_DestroyAudio(
             self.value,
         );
+    }
+
+    /// Convert sample frames for a MIX Audio's format to milliseconds.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio to query.
+    /// * `frames`: The audio-specific sample frames to convert to milliseconds.
+    ///
+    /// ## Return Value
+    /// Returns converted number of milliseconds.
+    ///
+    /// ## Remarks
+    /// This calculates time based on the audio's initial format, even if the format would change mid-stream.
+    ///
+    /// Sample frames are more precise than milliseconds, so out of necessity, this function will approximate by rounding down to the closest full millisecond.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn framesToMs(
+        self: Audio,
+        frames: usize,
+    ) !usize {
+        return @intCast(try errors.wrapCall(c.Sint64, c.MIX_AudioFramesToMS(self.value, @intCast(frames)), -1));
     }
 
     /// Get the total playback duration of an audio object, in sample frames.
@@ -236,19 +245,272 @@ pub const Audio = struct {
         try errors.wrapCallBool(ret);
         return audio.Spec.fromSdl(spec);
     }
+
+    /// Convert milliseconds to sample frames for an Audio's format.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio to query.
+    /// * `ms`: The milliseconds to convert to audio-specific sample frames.
+    ///
+    /// ## Return Value
+    /// Returns converted number of sample frames.
+    ///
+    /// ## Remarks
+    /// This calculates time based on the audio's initial format, even if the format would change mid-stream.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn msToFrames(
+        self: Audio,
+        ms: usize,
+    ) !usize {
+        return @intCast(try errors.wrapCall(c.Sint64, c.MIX_AudioMSToFrames(self.value, @intCast(ms)), -1));
+    }
 };
 
-/// An object that mixes audio and (optionally) sends it to an audio device.
+/// An opaque object that represents an audio decoder.
 ///
 /// ## Remarks
-/// This is an opaque datatype, to be treated by the app as a handle.
-/// A mixer owns the audio objects and tracks created through it;
-/// destroying the mixer destroys them too.
+/// Most apps won't need this, as SDL mixer's usual interfaces will decode audio as needed.
+/// However, if one wants to decode an audio file into a memory buffer without playing it, this interface offers that.
+///
+/// These objects are created with `AudioDecoder.init` or `AudioDecoder.initIo` and then can use `AudioDecoder.decode` to retrieve the raw PCM data.
+///
+/// ## Version
+/// This struct is available since SDL_mixer 3.0.0.
+pub const AudioDecoder = extern struct {
+    value: *c.MIX_AudioDecoder,
+
+    /// Decode more audio from a decoder.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The decoder from which to retrieve more data.
+    /// * `buffer`: The memory buffer to store decoded audio.
+    /// * `spec`: The format that audio data will be stored to `buffer`.
+    ///
+    /// ## Return Value
+    /// Returns the bytes that have been decoded or `null` if end of file.
+    ///
+    /// ## Remarks
+    /// Data is decoded on demand in whatever format is requested.
+    /// The format is permitted to change between calls.
+    ///
+    /// This function will return the bytes decoded, which may be less than requested if there was an error or end-of-file.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn decode(
+        self: AudioDecoder,
+        buffer: []u8,
+        spec: audio.Spec,
+    ) !?[]u8 {
+        const ret: usize = @intCast(try errors.wrapCall(c_int, c.MIX_DecodeAudio(self.value, buffer.ptr, @intCast(buffer.len), &spec.toSdl()), -1));
+        if (ret == 0)
+            return null;
+        return buffer[0..ret];
+    }
+
+    /// Create an audio decoder from a path on the filesystem.
+    ///
+    /// ## Function Parameters
+    /// * `path`: The path on the filesystem from which to load data.
+    /// * `props`: Decoder-specific properties if desired.
+    ///
+    /// ## Return Value
+    /// Returns an audio decoder, ready to decode.
+    ///
+    /// ## Remarks
+    /// Most apps won't need this, as SDL mixer's usual interfaces will decode audio as needed.
+    /// However, if one wants to decode an audio file into a memory buffer without playing it, this interface offers that.
+    ///
+    /// This function allows properties to be specified.
+    /// This is intended to supply file-specific settings, such as where to find SoundFonts for a MIDI file, etc.
+    /// In most cases, the caller should pass null to specify no extra properties.
+    ///
+    /// When done with the audio decoder, it can be destroyed with `AudioDecoder.deinit`
+    ///
+    /// This function requires SDL mixer to have been initialized with a successful call to `init`, but does not need an actual Mixer to have been created.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn init(
+        path: [*:0]const u8,
+        props: ?properties.Group,
+    ) !AudioDecoder {
+        return .{
+            .value = try errors.wrapCallNull(*c.MIX_AudioDecoder, c.MIX_CreateAudioDecoder(path, if (props) |val| val.value else 0)),
+        };
+    }
+
+    /// Create an audio decoder from an IO stream.
+    ///
+    /// ## Function Parameters
+    /// * `io`: The i/o stream from which to load data.
+    /// * `close_io`: If true, close the i/o stream when done with it.
+    /// * `props`: Decoder-specific properties if desired.
+    ///
+    /// ## Return Value
+    /// Returns an audio decoder, ready to decode.
+    ///
+    /// ## Remarks
+    /// Most apps won't need this, as SDL mixer's usual interfaces will decode audio as needed.
+    /// However, if one wants to decode an audio file into a memory buffer without playing it, this interface offers that.
+    ///
+    /// This function allows properties to be specified.
+    /// This is intended to supply file-specific settings, such as where to find SoundFonts for a MIDI file, etc.
+    /// In most cases, the caller should pass null to specify no extra properties.
+    ///
+    /// If `close_io` is true, then io will be closed when this decoder is done with it.
+    /// If this function fails and closeio is true, then io will be closed before this function returns.
+    ///
+    /// When done with the audio decoder, it can be destroyed with `AudioDecoder.deinit`
+    ///
+    /// This function requires SDL mixer to have been initialized with a successful call to `init`, but does not need an actual Mixer to have been created.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn initIo(
+        io: io_stream.Stream,
+        close_io: bool,
+        props: ?properties.Group,
+    ) !AudioDecoder {
+        return .{
+            .value = try errors.wrapCallNull(*c.MIX_AudioDecoder, c.MIX_CreateAudioDecoder_IO(io.value, close_io, if (props) |val| val.value else 0)),
+        };
+    }
+};
+
+/// An opaque object that represents a grouping of tracks.
+///
+/// ## Remarks
+/// SDL mixer offers callbacks at various stages of the mixing pipeline to allow apps to view and manipulate data as it is transformed.
+/// Sometimes it is useful to hook in at a point where several tracks--but not all tracks-- have been mixed.
+/// For example, when a game is in some options menu, perhaps adjusting game audio but not UI sounds could be useful.
+///
+/// SDL mixer allows you to assign several tracks to a group, and receive a callback when that group has finished mixing,
+/// with a buffer of just that group's mixed audio, before it mixes into the final output.
+///
+/// ## Version
+/// This datatype is available since SDL_mixer 3.0.0.
+pub const Group = struct {
+    value: *c.MIX_Group,
+
+    /// Create a new group of tracks on a mixer.
+    ///
+    /// ## Function Parameters
+    /// * `mixer`: The mixer to create the group on.
+    ///
+    /// ## Return Value
+    /// Returns a new `mixer.Group`. The caller must call `deinit()` on it when done.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn init(
+        mixer: Mixer,
+    ) !Group {
+        const ret = c.MIX_CreateGroup(
+            mixer.value,
+        );
+        return Group{ .value = try errors.wrapCallNull(*c.MIX_Group, ret) };
+    }
+
+    /// Dispose of a previously-created group.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The group to destroy.
+    ///
+    /// ## Remarks
+    /// Tracks in this group are not destroyed; they are simply no longer in a group.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same group from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn deinit(
+        self: Group,
+    ) void {
+        c.MIX_DestroyGroup(
+            self.value,
+        );
+    }
+};
+
+/// An opaque object that represents a mixer.
+///
+/// ## Remarks
+/// The MIX mixer is the toplevel object for this library.
+/// To use SDL mixer, you must have at least one, but are allowed to have several.
+/// Each mixer is responsible for generating a single output stream of mixed audio, usually to an audio device for realtime playback.
+///
+/// Mixers are either created to feed an audio device (through `Mixer.initDevice`), or to generate audio to a buffer in memory, where it can be used for anything (through `Mixer.init`).
 ///
 /// ## Version
 /// This datatype is available since SDL_mixer 3.0.0.
 pub const Mixer = struct {
     value: *c.MIX_Mixer,
+
+    /// Generate mixer output when not driving an audio device.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer for which to generate more audio.
+    /// * `buffer`: The buffer to store audio in.
+    ///
+    /// ## Return Value
+    /// Returns the portion of the buffer containing actually mixed audio.
+    ///
+    /// ## Remarks
+    /// SDL mixer allows the creation of MIX Mixer objects that are not connected to an audio device, by calling `Mixer.init` instead of `Mixer.initDevice`.
+    /// Such mixers will not generate output until explicitly requested through this function.
+    ///
+    /// The caller may request as much audio as desired, so long as buflen is a multiple of the sample frame size specified when creating the mixer
+    /// (for example, if requesting stereo Sint16 audio, buflen must be a multiple of 4: 2 bytes-per-channel times 2 channels).
+    ///
+    /// The mixer will mix as quickly as possible; since it works in sample frames instead of time, it can potentially generate enormous amounts of audio in a small amount of time.
+    ///
+    /// On success, this always fills buffer with buflen bytes of audio; if all playing tracks finish mixing, it will fill the remaining buffer with silence.
+    ///
+    /// Each call to this function will pick up where it left off, playing tracks will continue to mix from the point the previous call completed, etc.
+    /// The mixer state can be changed between each call in any way desired: tracks can be added, played, stopped, changed, removed, etc.
+    /// Effectively this function does the same thing SDL mixer does internally when the audio device needs more audio to play.
+    ///
+    /// This function can not be used with mixers from `Mixer.initDevice` those generate audio as needed internally.
+    ///
+    /// This function returns the number of the buffe of real audio mixed, which might be less than `buffer.len`.
+    /// While all buffer bytes of buffer will be initialized, if available tracks to mix run out, the end of the buffer will be initialized with silence;
+    /// this silence will not be counted in the return value, so the caller has the option to identify how much of the buffer has legimitate contents vs appended silence.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn generate(
+        self: Mixer,
+        buffer: []u8,
+    ) ![]u8 {
+        const len: usize = @intCast(try errors.wrapCall(c_int, c.MIX_Generate(
+            self.value,
+            buffer.ptr,
+            @intCast(buffer.len),
+        ), -1));
+        return buffer[0..len];
+    }
 
     /// Create a mixer that plays through an audio device.
     ///
@@ -459,65 +721,95 @@ pub const Mixer = struct {
     }
 };
 
-/// A logical grouping of tracks that can be operated on collectively.
+/// 3D coordinates for `track.set3dPosition`.
 ///
 /// ## Remarks
-/// This is an opaque datatype, to be treated by the app as a handle.
+/// The coordinates use a "right-handed" coordinate system, like OpenGL and OpenAL.
 ///
 /// ## Version
-/// This datatype is available since SDL_mixer 3.0.0.
-pub const Group = struct {
-    value: *c.MIX_Group,
+/// This struct is available since SDL_mixer 3.0.0.
+pub const Point3d = extern struct {
+    /// X coordinate (negative left, positive right).
+    x: f32,
+    /// Y coordinate (negative down, positive up).
+    y: f32,
+    /// Z coordinate (negative forward, positive back).
+    z: f32,
 
-    /// Create a new group of tracks on a mixer.
-    ///
-    /// ## Function Parameters
-    /// * `mixer`: The mixer to create the group on.
-    ///
-    /// ## Return Value
-    /// Returns a new `mixer.Group`. The caller must call `deinit()` on it when done.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn init(
-        mixer: Mixer,
-    ) !Group {
-        const ret = c.MIX_CreateGroup(
-            mixer.value,
-        );
-        return Group{ .value = try errors.wrapCallNull(*c.MIX_Group, ret) };
-    }
-
-    /// Dispose of a previously-created group.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The group to destroy.
-    ///
-    /// ## Remarks
-    /// Tracks in this group are not destroyed; they are simply no longer in a group.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same group from multiple threads at the same time without supplying a serialization mechanism.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn deinit(
-        self: Group,
-    ) void {
-        c.MIX_DestroyGroup(
-            self.value,
-        );
+    comptime {
+        errors.assertStructsEqual(@This(), c.MIX_Point3D);
     }
 };
 
-/// An individual audio source that can be played through a mixer.
+/// Options that control how a track begins playing.
 ///
 /// ## Remarks
-/// This is an opaque datatype, to be treated by the app as a handle.
-/// A track gets its sound from an assigned `mixer.Audio` and is then played, paused, faded, etc.
+/// All fields are optional; a `null` field uses SDL_mixer's default behavior for that setting.
+/// This maps to the `MIX_PROP_PLAY_*` properties that `Track.play()` accepts.
+///
+/// ## Version
+/// This type is provided by zig-sdl3.
+pub const PlayOptions = struct {
+    /// Number of times to loop the track after the first play, or `-1` to loop forever.
+    loops: ?i64 = null,
+    /// Fade the track in over this many milliseconds.
+    fade_in_milliseconds: ?i64 = null,
+    /// Start playback this many milliseconds into the audio.
+    start_millisecond: ?i64 = null,
+    /// Stop playback after this many milliseconds have been mixed.
+    max_milliseconds: ?i64 = null,
+
+    /// Convert to an SDL properties group.
+    pub fn toProperties(
+        self: PlayOptions,
+    ) !properties.Group {
+        const ret = try properties.Group.init();
+        if (self.loops) |val| try ret.set(
+            c.MIX_PROP_PLAY_LOOPS_NUMBER,
+            .{ .number = val },
+        );
+        if (self.fade_in_milliseconds) |val| try ret.set(
+            c.MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER,
+            .{ .number = val },
+        );
+        if (self.start_millisecond) |val| try ret.set(
+            c.MIX_PROP_PLAY_START_MILLISECOND_NUMBER,
+            .{ .number = val },
+        );
+        if (self.max_milliseconds) |val| try ret.set(
+            c.MIX_PROP_PLAY_MAX_MILLISECONDS_NUMBER,
+            .{ .number = val },
+        );
+        return ret;
+    }
+};
+
+/// A set of per-channel gains for tracks using `track.setStereo`.
+///
+/// ## Remarks
+/// When forcing a track to stereo, the app can specify a per-channel gain, to further adjust the left or right outputs.
+/// When mixing audio that has been forced to stereo, each channel is modulated by these values. A value of `1` produces no change, `0` produces silence.
+/// A simple panning effect would be to set left to the desired value and right to `1 - left`.
+///
+/// ## Version
+/// This struct is available since SDL_mixer 3.0.0.
+pub const StereoGains = extern struct {
+    /// Left channel gain.
+    left: f32,
+    /// Right channel gain.
+    right: f32,
+
+    comptime {
+        errors.assertStructsEqual(@This(), c.MIX_StereoGains);
+    }
+};
+
+/// An opaque object that represents a source of sound output to be mixed.
+///
+/// ## Remarks
+/// A MIX Mixer has an arbitrary number of tracks, and each track manages its own unique audio to be mixed together.
+///
+/// Tracks also have other properties: gain, loop points, fading, 3D position, and other attributes that alter the produced sound; many can be altered during playback.
 ///
 /// ## Version
 /// This datatype is available since SDL_mixer 3.0.0.
@@ -824,6 +1116,176 @@ pub const Track = struct {
     }
 };
 
+/// SDL mixer version information.
+pub const Version = struct {
+    value: c_int,
+
+    /// SDL mixer version compiled against.
+    ///
+    /// ## Version
+    /// This constant is available since SDL mixer 3.0.0.
+    pub const compiled_against = Version{ .value = c.SDL_MIXER_VERSION };
+
+    /// Check if the SDL mixer version is at least greater than the given one.
+    ///
+    /// ## Function Parameters
+    /// * `major`: The major version number.
+    /// * `minor`: The minor version number.
+    /// * `micro`: The micro version number.
+    ///
+    /// ## Return Value
+    /// Returns if the mixer version is at least this given version.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn atLeast(
+        major: u32,
+        minor: u32,
+        micro: u32,
+    ) bool {
+        const ret = c.SDL_MIXER_VERSION_ATLEAST(
+            major,
+            minor,
+            micro,
+        );
+        return ret;
+    }
+
+    /// Create an SDL mixer version number.
+    ///
+    /// ## Function Parameters
+    /// * `major`: The major version number.
+    /// * `minor`: The minor version number.
+    /// * `micro`: The micro version number.
+    ///
+    /// ## Return Value
+    /// Returns the new version number.
+    pub fn make(
+        major: u32,
+        minor: u32,
+        micro: u32,
+    ) Version {
+        const ret = c.SDL_VERSIONNUM(
+            @as(c_int, @intCast(major)),
+            @as(c_int, @intCast(minor)),
+            @as(c_int, @intCast(micro)),
+        );
+        return Version{ .value = ret };
+    }
+
+    /// Get the version of SDL mixer that is linked against your program.
+    /// Possibly different than the compiled against version.
+    ///
+    /// ## Remarks
+    /// If you are linking to SDL_mixer dynamically, then it is possible that the current version will be different than the version you compiled against.
+    /// This function returns the current version, while `compiled_against` is the version you compiled with.
+    ///
+    /// This function may be called safely at any time, even before `init`.
+    ///
+    /// ## Return Value
+    /// Returns the version compiled against mixer.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn get() Version {
+        const ret = c.MIX_Version();
+        return Version{ .value = ret };
+    }
+
+    /// Major version number.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The version.
+    ///
+    /// ## Return Value
+    /// The major version number.
+    pub fn getMajor(
+        self: Version,
+    ) u32 {
+        const ret = c.SDL_VERSIONNUM_MAJOR(
+            self.value,
+        );
+        return @intCast(ret);
+    }
+
+    /// Micro version number.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The version.
+    ///
+    /// ## Return Value
+    /// The micro version number.
+    pub fn getMicro(
+        self: Version,
+    ) u32 {
+        const ret = c.SDL_VERSIONNUM_MICRO(
+            self.value,
+        );
+        return @intCast(ret);
+    }
+
+    /// Minor version number.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The version.
+    ///
+    /// ## Return Value
+    /// The minor version number.
+    pub fn getMinor(
+        self: Version,
+    ) u32 {
+        const ret = c.SDL_VERSIONNUM_MINOR(
+            self.value,
+        );
+        return @intCast(ret);
+    }
+};
+
+/// Initialize the SDL mixer library.
+///
+/// ## Remarks
+/// This must be successfully called once before (almost) any other SDL_mixer function can be used.
+/// It is safe to call this multiple times; the library will only initialize once, and won't deinitialize until `mixer.quit()` has been called a matching number of times.
+/// Extra attempts to init report success.
+///
+/// ## Thread Safety
+/// This function is not thread safe.
+///
+/// ## Version
+/// This function is available since SDL_mixer 3.0.0.
+pub fn init() !void {
+    const ret = c.MIX_Init();
+    return errors.wrapCallBool(ret);
+}
+
+/// Deinitialize the SDL mixer library.
+///
+/// ## Remarks
+/// This must be called when done with the library, probably at the end of your program.
+///
+/// It is safe to call this multiple times; the library will only deinitialize once, when this function is called the same number of times as `init` was successfully called.
+///
+/// Once you have successfully deinitialized the library, it is safe to call `init` to reinitialize it for further use.
+///
+/// On successful deinitialization, SDL mixer will destroy almost all created objects, including objects of type:
+/// * Mixer
+/// * Track
+/// * Audio
+/// * Group
+/// * AudioDecoder
+/// ...which is to say: it's possible a single call to this function will clean up anything it allocated, stop all audio output, close audio devices, etc.
+/// Don't attempt to destroy objects after this call.
+/// The app is still encouraged to manage their resources carefully and clean up first, treating this function as a safety net against memory leaks.
+///
+/// ## Thread Safety
+/// This function is not thread safe.
+///
+/// ## Version
+/// This function is available since SDL_mixer 3.0.0.
+pub fn quit() void {
+    c.MIX_Quit();
+}
+
 test "mixer" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

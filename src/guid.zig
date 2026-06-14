@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// A `GUID` is a 128-bit identifier for an input device that identifies that device across runs of SDL programs on the same platform.
@@ -68,7 +69,7 @@ pub const Guid = struct {
 
 // GUID testing.
 test "GUID" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const guid = Guid{
         .value = .{

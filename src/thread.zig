@@ -496,7 +496,7 @@ fn tlsDestructor(value: ?*void) void {
 
 // Thread testing.
 test "Thread" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const t1 = try Thread.init(void, threadFunc, "Test", null);
     try std.testing.expectEqualStrings("Test", t1.getName().?);

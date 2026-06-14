@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// Application sandbox environment.
@@ -231,5 +232,5 @@ pub fn setX11EventHook(
 
 // System tests.
 test "System" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

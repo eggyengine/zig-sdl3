@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// True if (and only if) the compiler supports PowerPC Altivec intrinsics.
@@ -124,7 +125,7 @@ pub const sse42 = @hasDecl(c, "SDL_SSE4_2_INTRINSICS");
 
 // Intrinsic tests.
 test "Intin" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     _ = altivec;
     _ = avx;

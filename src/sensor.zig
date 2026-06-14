@@ -374,7 +374,7 @@ pub fn update() void {
 
 // Sensor related tests.
 test "Sensor" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     defer sdl3.shutdown();
     try sdl3.init(.{ .sensor = true });

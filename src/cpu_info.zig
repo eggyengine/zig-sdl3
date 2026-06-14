@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// A guess for the cacheline size used for padding.
@@ -344,7 +345,7 @@ pub fn hasSse42() bool {
 
 // CPU testing.
 test "CPU Info" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     _ = cacheline_size;
     _ = getCacheLineSize();
