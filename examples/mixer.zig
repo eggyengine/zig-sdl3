@@ -12,6 +12,7 @@ pub fn main(
     init: std.process.Init,
 ) !void {
     _ = init;
+    defer sdl3.shutdown();
 
     const log_app = sdl3.log.Category.application;
 
@@ -27,14 +28,14 @@ pub fn main(
     try log_app.logInfo("Linked against SDL_mixer {d}.{d}.{d}", .{ linked_version.getMajor(), linked_version.getMinor(), linked_version.getMicro() });
 
     // Open a mixer on the default playback device, letting SDL_mixer pick the format.
-    const mixer: sdl3.mixer.Mixer = try .init(sdl3.audio.Device.default_playback, null);
+    const mixer = try sdl3.mixer.Mixer.initDevice(sdl3.audio.Device.default_playback, null);
     defer mixer.deinit();
 
     // Generate an infinite sine wave (`null` duration).
-    const tone: sdl3.mixer.Audio = try mixer.createSineWaveAudio(tone_hz, tone_amplitude, null);
+    const tone = try sdl3.mixer.Audio.initSineWaveAudio(mixer, tone_hz, tone_amplitude, null);
     defer tone.deinit();
 
-    const track: sdl3.mixer.Track = try .init(mixer);
+    const track = try sdl3.mixer.Track.init(mixer);
     defer track.deinit();
 
     try track.setAudio(tone);

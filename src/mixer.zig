@@ -152,13 +152,18 @@ pub fn TrackStoppedCallback(comptime UserData: type) type {
 pub const Audio = extern struct {
     value: *c.MIX_Audio,
 
-    /// Dispose of a previously-loaded audio object.
+    /// Destroy the specified audio.
     ///
     /// ## Function Parameters
     /// * `self`: The audio object to destroy.
     ///
     /// ## Remarks
-    /// Tracks that are still using this audio object will stop playing.
+    /// Audio is reference-counted internally, so this function only unrefs it.
+    /// If doing so causes the reference count to drop to zero, the audio will be deallocated.
+    /// This allows the system to safely operate if the audio is still assigned to a `Track` at the time of destruction.
+    /// The actual destroying will happen when the track stops using it.
+    ///
+    /// But from the caller's perspective, once this function is called, it should assume the audio pointer has become invalid.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -246,6 +251,49 @@ pub const Audio = extern struct {
         return audio.Spec.fromSdl(spec);
     }
 
+    /// Create an audio object that produces a sine wave.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer the audio will be used with.
+    /// * `hz`: The frequency of the sine wave, in Hz.
+    /// * `amplitude`: The amplitude of the sine wave, from `0` (silence) to `1` (full volume).
+    /// * `milliseconds`: The duration of the generated audio in milliseconds, or `null` to generate infinite audio that plays forever.
+    ///
+    /// ## Return Value
+    /// Returns a new `mixer.Audio`.
+    /// The caller must call `deinit()` on it when done.
+    ///
+    /// ## Remarks
+    /// This is useful just to have something to play, perhaps for testing or debugging purposes.
+    ///
+    /// You specify its frequency in Hz (determines the pitch of the sinewave's audio) and amplitude (determines the volume of the sinewave: `1` is very loud, `0` is silent).
+    ///
+    /// A number of milliseconds of audio to generate can be specified.
+    /// Specifying a value less than zero will generate infinite audio (when assigned to a `Track`, the sinewave will play forever).
+    ///
+    /// `Audio` objects can be shared between multiple mixers.
+    /// The mixer parameter just suggests the most likely mixer to use this audio, in case some optimization might be applied, but this is not required, and a `null` mixer may be specified.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn initSineWaveAudio(
+        self: ?Mixer,
+        hz: u31,
+        amplitude: f32,
+        milliseconds: ?usize,
+    ) !Audio {
+        const ret = c.MIX_CreateSineWaveAudio(
+            if (self) |val| val.value else null,
+            @intCast(hz),
+            amplitude,
+            if (milliseconds) |ms| @intCast(ms) else -1,
+        );
+        return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
+    }
+
     /// Convert milliseconds to sample frames for an Audio's format.
     ///
     /// ## Function Parameters
@@ -314,6 +362,22 @@ pub const AudioDecoder = extern struct {
         if (ret == 0)
             return null;
         return buffer[0..ret];
+    }
+
+    /// Destroy the specified audio decoder.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio to destroy.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// Version
+    /// ## This function is available since SDL_mixer 3.0.0.
+    pub fn deinit(
+        self: AudioDecoder,
+    ) void {
+        c.MIX_DestroyAudioDecoder(self.value);
     }
 
     /// Create an audio decoder from a path on the filesystem.
@@ -407,13 +471,45 @@ pub const AudioDecoder = extern struct {
 pub const Group = struct {
     value: *c.MIX_Group,
 
-    /// Create a new group of tracks on a mixer.
+    /// Destroy a mixing group.
     ///
     /// ## Function Parameters
-    /// * `mixer`: The mixer to create the group on.
+    /// * `self`: The group to destroy.
+    ///
+    /// ## Remarks
+    /// Any tracks currently assigned to this group will be reassigned to the mixer's internal default group.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn deinit(
+        self: Group,
+    ) void {
+        c.MIX_DestroyGroup(
+            self.value,
+        );
+    }
+
+    /// Create a mixing group.
+    ///
+    /// ## Function Parameters
+    /// * `mixer`: The mixer on which to create a mixing group.
     ///
     /// ## Return Value
-    /// Returns a new `mixer.Group`. The caller must call `deinit()` on it when done.
+    /// Returns a new `Group`. The caller must call `deinit()` on it when done.
+    ///
+    /// ## Remarks
+    /// Tracks are assigned to a mixing group (or if unassigned, they live in a mixer's internal default group).
+    /// All tracks in a group are mixed together and the app can access this mixed data before it is mixed with all other groups to produce the final output.
+    ///
+    /// This can be a useful feature, but is completely optional; apps can ignore mixing groups entirely and still have a full experience with SDL mixer.
+    ///
+    /// After creating a group, assign tracks to it with `Track.setGroup`. Use `Group.setPostMixCallback` to access the group's mixed data.
+    ///
+    /// A mixing group can be destroyed with `Group.deinit` when no longer needed.
+    /// Destroying the mixer will also destroy all its still-existing mixing groups.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -429,25 +525,49 @@ pub const Group = struct {
         return Group{ .value = try errors.wrapCallNull(*c.MIX_Group, ret) };
     }
 
-    /// Dispose of a previously-created group.
+    /// Set a callback that fires when a mixer group has completed mixing.
     ///
     /// ## Function Parameters
-    /// * `self`: The group to destroy.
+    /// * `self`: The mixing group to assign this callback to.
+    /// * `UserData`: Type of user data for the callback.
+    /// * `callback`: The function to call when the group mixes or `null` to clear.
+    /// * `user_data`: The user data to pass to the callback.
     ///
     /// ## Remarks
-    /// Tracks in this group are not destroyed; they are simply no longer in a group.
+    /// After all playing tracks in a mixer group have pulled in more data from their inputs, transformed it, and mixed together into a single buffer,
+    /// a callback can be fired. This lets an app view the data at the last moment that it is still a part of this group.
+    /// It can also change the data in any way it pleases during this callback, and the mixer will continue as if this data came directly from the group's mix buffer.
     ///
-    /// ## Thread Safety
-    /// You should not operate on the same group from multiple threads at the same time without supplying a serialization mechanism.
+    /// Each group has its own unique callback.
+    /// Tracks that aren't in an explicit `Group` are mixed in an internal grouping that is not available to the app.
+    ///
+    /// Passing a `null` callback here is legal; it disables this group's callback.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn deinit(
+    pub fn setGroupPostCallback(
         self: Group,
-    ) void {
-        c.MIX_DestroyGroup(
-            self.value,
-        );
+        comptime UserData: type,
+        comptime callback: ?GroupMixCallback(UserData),
+        user_data: ?*UserData,
+    ) !void {
+        const Cb = struct {
+            pub fn run(
+                user_data_c: ?*anyopaque,
+                group_c: [*c]c.MIX_Group,
+                spec_c: [*c]c.SDL_AudioSpec,
+                pcm_c: [*c]f32,
+                samples_c: c_int,
+            ) callconv(.c) void {
+                return callback(
+                    @ptrCast(@alignCast(user_data_c)),
+                    .{ .value = group_c },
+                    audio.Spec.fromSdl(spec_c.*),
+                    pcm_c[0..@intCast(samples_c)],
+                );
+            }
+        };
+        return errors.wrapCallBool(c.MIX_SetGroupPostMixCallback(self.value, if (callback != null) Cb.run else null, @ptrCast(@alignCast(user_data))));
     }
 };
 
@@ -464,6 +584,27 @@ pub const Group = struct {
 /// This datatype is available since SDL_mixer 3.0.0.
 pub const Mixer = struct {
     value: *c.MIX_Mixer,
+
+    /// Dispose of a previously-created mixer.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to destroy.
+    ///
+    /// ## Remarks
+    /// This also destroys all tracks and audio objects created through this mixer.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same mixer from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn deinit(
+        self: Mixer,
+    ) void {
+        c.MIX_DestroyMixer(
+            self.value,
+        );
+    }
 
     /// Generate mixer output when not driving an audio device.
     ///
@@ -512,7 +653,37 @@ pub const Mixer = struct {
         return buffer[0..len];
     }
 
-    /// Create a mixer that plays through an audio device.
+    /// Create a mixer that generates audio to a memory buffer.
+    ///
+    /// ## Function Parameters
+    /// * `spec`: The audio format that mixer will generate.
+    ///
+    /// ## Return Value
+    /// Returns a mixer that can be used to generate audio.
+    ///
+    /// ## Remarks
+    /// Usually you want `Mixer.initDevice` instead of this function.
+    /// The mixer created here can be used with `Mixer.generate` to produce more data on demand, as fast as desired.
+    ///
+    /// An audio format must be specified.
+    /// This is the format it will output in.
+    ///
+    /// Once a mixer is created, next steps are usually to load audio (through `Mixer.loadAudio` and friends), create a track (`Mixer.createTrack`), and play that audio through that track.
+    ///
+    /// When done with the mixer, it can be destroyed with `Mixer.deinit`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn init(
+        spec: audio.Spec,
+    ) !Mixer {
+        return Mixer{ .value = try errors.wrapCallNull(*c.MIX_Mixer, c.MIX_CreateMixer(&spec.toSdl())) };
+    }
+
+    /// Create a mixer that plays sound directly to an audio device.
     ///
     /// ## Function Parameters
     /// * `device`: The audio device to open, such as `audio.Device.default_playback`.
@@ -522,14 +693,31 @@ pub const Mixer = struct {
     /// Returns a new `mixer.Mixer`.
     ///
     /// ## Remarks
-    /// When you are done with the returned mixer, dispose of it with `deinit()`.
+    /// This is usually the function you want, vs `Mixer.init`.
+    ///
+    /// You can choose a specific device ID to open, following SDL's usual rules, but often the correct choice is to specify `audio.Device.default_playback`
+    /// and let SDL figure out what device to use (and seamlessly transition you to new hardware if the default changes).
+    ///
+    /// Only playback devices make sense here. Attempting to open a recording device will fail.
+    ///
+    /// This will call `sdl3.init(.{ .audio = true })` internally; it's safe to call `sdl3.init` before this call, too, if you intend to enumerate audio devices to choose one to open here.
+    ///
+    /// An audio format can be requested, and the system will try to set the hardware to those specifications, or as close as possible, but this is just a hint.
+    /// SDL mixer will handle all data conversion behind the scenes in any case, and specifying a `null` spec is a reasonable choice.
+    /// The best reason to specify a format is because you know all your data is in that format and it might save some unnecessary CPU time on conversion.
+    ///
+    /// The actual device format chosen is available through `Mixer.getFormat`.
+    ///
+    /// Once a mixer is created, next steps are usually to load audio (through `Mixer.loadAudio` and friends), create a track (`Mixer.Track.init`), and play that audio through that track.
+    ///
+    /// When done with the mixer, it can be destroyed with `Mixer.deinit`.
     ///
     /// ## Thread Safety
-    /// It is safe to call this function from any thread.
+    /// This function should only be called on the main thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn init(
+    pub fn initDevice(
         device: audio.Device,
         spec: ?audio.Spec,
     ) !Mixer {
@@ -541,34 +729,25 @@ pub const Mixer = struct {
         return Mixer{ .value = try errors.wrapCallNull(*c.MIX_Mixer, ret) };
     }
 
-    /// Dispose of a previously-created mixer.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The mixer to destroy.
-    ///
-    /// ## Remarks
-    /// This also destroys all tracks and audio objects created through this mixer.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same mixer from multiple threads at the same time without supplying a serialization mechanism.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn deinit(
-        self: Mixer,
-    ) void {
-        c.MIX_DestroyMixer(
-            self.value,
-        );
-    }
-
-    /// Get the audio format the mixer is mixing in.
+    /// Get the audio format a mixer is generating.
     ///
     /// ## Function Parameters
     /// * `self`: The mixer to query.
     ///
     /// ## Return Value
     /// Returns the audio specification of the mixer.
+    ///
+    /// ## Remarks
+    /// Generally you don't need this information, as SDL mixer will convert data as necessary between inputs you provide and its output format,
+    /// but it might be useful if trying to match your inputs to reduce conversion and resampling costs.
+    ///
+    /// For mixers created with `Mixer.initDevice`, this is the format of the audio device (and may change later if the device itself changes;
+    /// SDL_mixer will seamlessly handle this change internally, though).
+    ///
+    /// For mixers created with `Mixer.init`, this is the format that `Mixer.generate` will produce, as requested at create time, and does not change.
+    ///
+    /// Note that internally, SDL mixer will work in `floating_32_bit` format before outputting the format specified here,
+    /// so it would be more efficient to match input data to that, not the final output format.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -585,28 +764,6 @@ pub const Mixer = struct {
         );
         try errors.wrapCallBool(ret);
         return audio.Spec.fromSdl(spec);
-    }
-
-    /// Set the master gain (volume) of the mixer.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The mixer to modify.
-    /// * `gain`: The new gain, where `0.0` is silence and `1.0` is full volume. Values above `1.0` are allowed.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn setGain(
-        self: Mixer,
-        gain: f32,
-    ) !void {
-        const ret = c.MIX_SetMixerGain(
-            self.value,
-            gain,
-        );
-        return errors.wrapCallBool(ret);
     }
 
     /// Get the master gain (volume) of the mixer.
@@ -689,35 +846,26 @@ pub const Mixer = struct {
         return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
     }
 
-    /// Create an audio object that produces a sine wave.
+    /// Set the master gain (volume) of the mixer.
     ///
     /// ## Function Parameters
-    /// * `self`: The mixer the audio will be used with.
-    /// * `hz`: The frequency of the sine wave, in Hz.
-    /// * `amplitude`: The amplitude of the sine wave, from `0.0` (silence) to `1.0` (full volume).
-    /// * `milliseconds`: The duration of the generated audio in milliseconds, or `null` to generate infinite audio that plays forever.
-    ///
-    /// ## Return Value
-    /// Returns a new `mixer.Audio`. The caller must call `deinit()` on it when done.
+    /// * `self`: The mixer to modify.
+    /// * `gain`: The new gain, where `0.0` is silence and `1.0` is full volume. Values above `1.0` are allowed.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn createSineWaveAudio(
+    pub fn setGain(
         self: Mixer,
-        hz: i32,
-        amplitude: f32,
-        milliseconds: ?i64,
-    ) !Audio {
-        const ret = c.MIX_CreateSineWaveAudio(
+        gain: f32,
+    ) !void {
+        const ret = c.MIX_SetMixerGain(
             self.value,
-            @intCast(hz),
-            amplitude,
-            if (milliseconds) |ms| @intCast(ms) else -1,
+            gain,
         );
-        return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
+        return errors.wrapCallBool(ret);
     }
 };
 
@@ -816,28 +964,6 @@ pub const StereoGains = extern struct {
 pub const Track = struct {
     value: *c.MIX_Track,
 
-    /// Create a new track on a mixer.
-    ///
-    /// ## Function Parameters
-    /// * `mixer`: The mixer to create the track on.
-    ///
-    /// ## Return Value
-    /// Returns a new `mixer.Track`. The caller must call `deinit()` on it when done.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn init(
-        mixer: Mixer,
-    ) !Track {
-        const ret = c.MIX_CreateTrack(
-            mixer.value,
-        );
-        return Track{ .value = try errors.wrapCallNull(*c.MIX_Track, ret) };
-    }
-
     /// Dispose of a previously-created track.
     ///
     /// ## Function Parameters
@@ -856,110 +982,56 @@ pub const Track = struct {
         );
     }
 
-    /// Assign an audio object to a track as its sound source.
+    /// Create a new track on a mixer.
     ///
     /// ## Function Parameters
-    /// * `self`: The track to modify.
-    /// * `audio_data`: The audio object to assign to the track.
+    /// * `mixer`: The mixer to create the track on.
+    ///
+    /// ## Return Value
+    /// Returns a new `mixer.Track`. The caller must call `deinit()` on it when done.
+    ///
+    /// ## Remarks
+    /// A track provides a single source of audio.
+    /// All currently-playing tracks will be processed and mixed together to form the final output from the mixer.
+    ///
+    /// There are no limits to the number of tracks one may create, beyond running out of memory,
+    /// but in normal practice there are a small number of tracks that are reused between all loaded audio as appropriate.
+    ///
+    /// Tracks are unique to a specific `Mixer` and can't be transferred between them.
     ///
     /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    /// It is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn setAudio(
-        self: Track,
-        audio_data: Audio,
-    ) !void {
-        const ret = c.MIX_SetTrackAudio(
-            self.value,
-            audio_data.value,
+    pub fn init(
+        mixer: Mixer,
+    ) !Track {
+        const ret = c.MIX_CreateTrack(
+            mixer.value,
         );
-        return errors.wrapCallBool(ret);
+        return Track{ .value = try errors.wrapCallNull(*c.MIX_Track, ret) };
     }
 
-    /// Start (or restart) playback of a track.
+    /// Get the gain (volume) of a track.
     ///
     /// ## Function Parameters
-    /// * `self`: The track to play.
-    /// * `options`: How the track should begin playing.
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// Returns the current track gain.
     ///
     /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    /// It is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn play(
+    pub fn getGain(
         self: Track,
-        options: PlayOptions,
-    ) !void {
-        const group = try options.toProperties();
-        defer group.deinit();
-        const ret = c.MIX_PlayTrack(
-            self.value,
-            group.value,
-        );
-        return errors.wrapCallBool(ret);
-    }
-
-    /// Stop playback of a track.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The track to stop.
-    /// * `fade_out_frames`: Fade the track out over this many sample frames, or `0` to stop immediately.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn stop(
-        self: Track,
-        fade_out_frames: i64,
-    ) !void {
-        const ret = c.MIX_StopTrack(
-            self.value,
-            @intCast(fade_out_frames),
-        );
-        return errors.wrapCallBool(ret);
-    }
-
-    /// Pause playback of a track.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The track to pause.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn pause(
-        self: Track,
-    ) !void {
-        const ret = c.MIX_PauseTrack(
+    ) f32 {
+        return c.MIX_GetTrackGain(
             self.value,
         );
-        return errors.wrapCallBool(ret);
-    }
-
-    /// Resume playback of a paused track.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The track to resume.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn resumeTrack(
-        self: Track,
-    ) !void {
-        const ret = c.MIX_ResumeTrack(
-            self.value,
-        );
-        return errors.wrapCallBool(ret);
     }
 
     /// Check if a track is currently playing.
@@ -1004,6 +1076,90 @@ pub const Track = struct {
         );
     }
 
+    /// Pause playback of a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to pause.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn pause(
+        self: Track,
+    ) !void {
+        const ret = c.MIX_PauseTrack(
+            self.value,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Start (or restart) playback of a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to play.
+    /// * `options`: How the track should begin playing.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn play(
+        self: Track,
+        options: PlayOptions,
+    ) !void {
+        const group = try options.toProperties();
+        defer group.deinit();
+        const ret = c.MIX_PlayTrack(
+            self.value,
+            group.value,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Resume playback of a paused track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to resume.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn resumeTrack(
+        self: Track,
+    ) !void {
+        const ret = c.MIX_ResumeTrack(
+            self.value,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Assign an audio object to a track as its sound source.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to modify.
+    /// * `audio_data`: The audio object to assign to the track.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setAudio(
+        self: Track,
+        audio_data: Audio,
+    ) !void {
+        const ret = c.MIX_SetTrackAudio(
+            self.value,
+            audio_data.value,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
     /// Set the gain (volume) of a track.
     ///
     /// ## Function Parameters
@@ -1026,35 +1182,21 @@ pub const Track = struct {
         return errors.wrapCallBool(ret);
     }
 
-    /// Get the gain (volume) of a track.
+    /// Assign a track to a mixing group.
     ///
     /// ## Function Parameters
-    /// * `self`: The track to query.
+    /// * `self`: The track to set mixing group assignment.
+    /// * `group`: The group to assign the track to, or `null` to remove it from any group.
     ///
-    /// ## Return Value
-    /// Returns the current track gain.
+    /// ## Remarks
+    /// All tracks in a group are mixed together, and that output is made available to the app before it is mixed into the final output.
+    ///
+    /// Tracks can only be in one group at a time, and the track and group must have been created on the same `Mixer`.
+    ///
+    /// Setting a track to a `null` group will remove it from any app-created groups, and reassign it to the mixer's internal default group.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn getGain(
-        self: Track,
-    ) f32 {
-        return c.MIX_GetTrackGain(
-            self.value,
-        );
-    }
-
-    /// Assign a track to a group, or remove it from its group.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The track to modify.
-    /// * `group`: The group to assign the track to, or `null` to remove it from any group.
-    ///
-    /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
@@ -1064,7 +1206,29 @@ pub const Track = struct {
     ) !void {
         const ret = c.MIX_SetTrackGroup(
             self.value,
-            if (group) |g| g.value else null,
+            if (group) |val| val.value else null,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Stop playback of a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to stop.
+    /// * `fade_out_frames`: Fade the track out over this many sample frames, or `0` to stop immediately.
+    ///
+    /// ## Thread Safety
+    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn stop(
+        self: Track,
+        fade_out_frames: i64,
+    ) !void {
+        const ret = c.MIX_StopTrack(
+            self.value,
+            @intCast(fade_out_frames),
         );
         return errors.wrapCallBool(ret);
     }
