@@ -204,13 +204,25 @@ pub const Audio = extern struct {
         return @intCast(try errors.wrapCall(c.Sint64, c.MIX_AudioFramesToMS(self.value, @intCast(frames)), -1));
     }
 
-    /// Get the total playback duration of an audio object, in sample frames.
+    /// Get the total playback duration of an audio object in sample frames.
     ///
     /// ## Function Parameters
-    /// * `self`: The audio object to query.
+    /// * `self`: The audio to query.
     ///
     /// ## Return Value
-    /// Returns the duration in sample frames, or a negative value if the duration is unknown or infinite.
+    /// Returns the duration in sample frames, or if its infinite, or `null` if unknown.
+    ///
+    /// ## Remarks
+    /// This information is also available via the `duration_frames` property, but it's common enough to provide a simple accessor function.
+    ///
+    /// This reports the length of the data in sample frames, so sample-perfect mixing can be possible.
+    /// Sample frames are only meaningful as a measure of time if the sample rate (frequency) is also known.
+    /// To convert from sample frames to milliseconds, use `Audio.framesToMs`.
+    ///
+    /// Not all audio file formats can report the complete length of the data they will produce through decoding: some can't calculate it, some might produce infinite audio.
+    ///
+    /// Also, some file formats can only report duration as a unit of time, which means SDL mixer might have to estimate sample frames from that information.
+    /// With less precision, the reported duration might be off by a few sample frames in either direction.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -219,11 +231,15 @@ pub const Audio = extern struct {
     /// This function is available since SDL_mixer 3.0.0.
     pub fn getDuration(
         self: Audio,
-    ) i64 {
+    ) ?AudioDuration {
         const ret = c.MIX_GetAudioDuration(
             self.value,
         );
-        return @intCast(ret);
+        if (ret == -1)
+            return null;
+        if (ret == -2)
+            return .{ .infinite = {} };
+        return .{ .frames = @intCast(ret) };
     }
 
     /// Get the audio format of an audio object.
@@ -233,6 +249,10 @@ pub const Audio = extern struct {
     ///
     /// ## Return Value
     /// Returns the audio specification of the audio object.
+    ///
+    /// ## Remarks
+    /// Note that some audio files can change format in the middle; some explicitly support this, but a more common example is two MP3 files concatenated together.
+    /// In many cases, SDL_mixer will correctly handle these sort of files, but this function will only report the initial format a file uses.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
@@ -380,6 +400,31 @@ pub const AudioDecoder = extern struct {
         c.MIX_DestroyAudioDecoder(self.value);
     }
 
+    /// Query the initial audio format of an audio decoder.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio decoder to query.
+    ///
+    /// ## Return Value
+    /// Returns the audio format details.
+    ///
+    /// ## Remarks
+    /// Note that some audio files can change format in the middle; some explicitly support this, but a more common example is two MP3 files concatenated together.
+    /// In many cases, SDL mixer will correctly handle these sort of files, but this function will only report the initial format a file uses.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getFormat(
+        self: AudioDecoder,
+    ) !audio.Spec {
+        var ret: c.SDL_AudioSpec = undefined;
+        try errors.wrapCallBool(c.MIX_GetAudioDecoderFormat(self.value, &ret));
+        return audio.Spec.fromSdl(ret);
+    }
+
     /// Create an audio decoder from a path on the filesystem.
     ///
     /// ## Function Parameters
@@ -456,6 +501,14 @@ pub const AudioDecoder = extern struct {
     }
 };
 
+/// The duration of an audio track.
+pub const AudioDuration = union(enum) {
+    /// Audio duration in frames.
+    frames: usize,
+    /// The duration of the audio is infinite.
+    infinite: void,
+};
+
 /// An opaque object that represents a grouping of tracks.
 ///
 /// ## Remarks
@@ -490,6 +543,28 @@ pub const Group = struct {
         c.MIX_DestroyGroup(
             self.value,
         );
+    }
+
+    /// Get the mixer that owns a group.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The group to query.
+    ///
+    /// ## Return Value
+    /// Returns the mixer associated with the group.
+    ///
+    /// ## Remarks
+    /// This is the mixer pointer that was passed to `Group.init`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getMixer(
+        self: Group,
+    ) !Mixer {
+        return .{ .value = try errors.wrapCallNull(*c.MIX_Mixer, c.MIX_GetGroupMixer(self.value)) };
     }
 
     /// Create a mixing group.
@@ -585,16 +660,21 @@ pub const Group = struct {
 pub const Mixer = struct {
     value: *c.MIX_Mixer,
 
-    /// Dispose of a previously-created mixer.
+    /// Free a mixer.
     ///
     /// ## Function Parameters
     /// * `self`: The mixer to destroy.
     ///
     /// ## Remarks
-    /// This also destroys all tracks and audio objects created through this mixer.
+    /// If this mixer was created with `Mixer.initDevice`, this function will also close the audio device and call `sdl3.quit(.{ .audio = true })`.
+    ///
+    /// Any `Group` or `Track` created for this mixer will also be destroyed.
+    /// Do not access them again or attempt to destroy them after the device is destroyed.
+    /// `Audio` objects will not be destroyed, since they can be shared between mixers (but those will all be destroyed during `quit`).
     ///
     /// ## Thread Safety
-    /// You should not operate on the same mixer from multiple threads at the same time without supplying a serialization mechanism.
+    /// If this is used with a `Mixer` from `Mixer.initDevice`, then this function should only be called on the main thread.
+    /// If this is used with a `Mixer` from `Mixer.init`, then it is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
@@ -651,6 +731,116 @@ pub const Mixer = struct {
             @intCast(buffer.len),
         ), -1));
         return buffer[0..len];
+    }
+
+    /// Get the audio format a mixer is generating.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to query.
+    ///
+    /// ## Return Value
+    /// Returns the audio specification of the mixer.
+    ///
+    /// ## Remarks
+    /// Generally you don't need this information, as SDL mixer will convert data as necessary between inputs you provide and its output format,
+    /// but it might be useful if trying to match your inputs to reduce conversion and resampling costs.
+    ///
+    /// For mixers created with `Mixer.initDevice`, this is the format of the audio device (and may change later if the device itself changes;
+    /// SDL_mixer will seamlessly handle this change internally, though).
+    ///
+    /// For mixers created with `Mixer.init`, this is the format that `Mixer.generate` will produce, as requested at create time, and does not change.
+    ///
+    /// Note that internally, SDL mixer will work in `floating_32_bit` format before outputting the format specified here,
+    /// so it would be more efficient to match input data to that, not the final output format.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getFormat(
+        self: Mixer,
+    ) !audio.Spec {
+        var spec: c.SDL_AudioSpec = undefined;
+        const ret = c.MIX_GetMixerFormat(
+            self.value,
+            &spec,
+        );
+        try errors.wrapCallBool(ret);
+        return audio.Spec.fromSdl(spec);
+    }
+
+    /// Get a mixer's master frequency ratio.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to query.
+    ///
+    /// ## Return Value
+    /// Returns the mixer's current master frequency ratio.
+    ///
+    /// ## Remarks
+    /// This returns the last value set through `Mixer.setFrequencyRatio`, or `1` if no value has ever been explicitly set.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getFrequencyRatio(
+        self: Mixer,
+    ) f32 {
+        return c.MIX_GetMixerFrequencyRatio(self.value);
+    }
+
+    /// Get a mixer's master gain control.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to query.
+    ///
+    /// ## Return Value
+    /// Returns the current master gain.
+    ///
+    /// ## Remarks
+    /// This returns the last value set through `Mixer.setGain` or `1` if no value has ever been explicitly set.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getGain(
+        self: Mixer,
+    ) f32 {
+        return c.MIX_GetMixerGain(
+            self.value,
+        );
+    }
+
+    /// Get all tracks with a specific tag.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to query.
+    /// * `tag`: The tag to search.
+    ///
+    /// ## Return Value
+    /// Returns an array of the tracks.
+    /// The returned slice should be freed with `sdl3.free` when it is no longer needed.
+    ///
+    /// ## Remarks
+    /// Tracks are not provided in any guaranteed order.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getTaggedTracks(
+        self: Mixer,
+        tag: [:0]const u8,
+    ) ![]Track {
+        var num: c_int = undefined;
+        const ret = try errors.wrapCallNull([*]Track, @ptrCast(@alignCast(c.MIX_GetTaggedTracks(self.value, tag, &num))));
+        return ret[0..@intCast(num)];
     }
 
     /// Create a mixer that generates audio to a memory buffer.
@@ -727,64 +917,6 @@ pub const Mixer = struct {
             if (spec != null) &spec_sdl else null,
         );
         return Mixer{ .value = try errors.wrapCallNull(*c.MIX_Mixer, ret) };
-    }
-
-    /// Get the audio format a mixer is generating.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The mixer to query.
-    ///
-    /// ## Return Value
-    /// Returns the audio specification of the mixer.
-    ///
-    /// ## Remarks
-    /// Generally you don't need this information, as SDL mixer will convert data as necessary between inputs you provide and its output format,
-    /// but it might be useful if trying to match your inputs to reduce conversion and resampling costs.
-    ///
-    /// For mixers created with `Mixer.initDevice`, this is the format of the audio device (and may change later if the device itself changes;
-    /// SDL_mixer will seamlessly handle this change internally, though).
-    ///
-    /// For mixers created with `Mixer.init`, this is the format that `Mixer.generate` will produce, as requested at create time, and does not change.
-    ///
-    /// Note that internally, SDL mixer will work in `floating_32_bit` format before outputting the format specified here,
-    /// so it would be more efficient to match input data to that, not the final output format.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn getFormat(
-        self: Mixer,
-    ) !audio.Spec {
-        var spec: c.SDL_AudioSpec = undefined;
-        const ret = c.MIX_GetMixerFormat(
-            self.value,
-            &spec,
-        );
-        try errors.wrapCallBool(ret);
-        return audio.Spec.fromSdl(spec);
-    }
-
-    /// Get the master gain (volume) of the mixer.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The mixer to query.
-    ///
-    /// ## Return Value
-    /// Returns the current master gain.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_mixer 3.0.0.
-    pub fn getGain(
-        self: Mixer,
-    ) f32 {
-        return c.MIX_GetMixerGain(
-            self.value,
-        );
     }
 
     /// Load audio data from a filesystem path.
@@ -887,6 +1019,28 @@ pub const Point3d = extern struct {
     comptime {
         errors.assertStructsEqual(@This(), c.MIX_Point3D);
     }
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(
+        value: c.MIX_Point3D,
+    ) Point3d {
+        return .{
+            .x = value.x,
+            .y = value.y,
+            .z = value.z,
+        };
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(
+        self: Point3d,
+    ) c.MIX_Point3D {
+        return .{
+            .x = self.x,
+            .y = self.y,
+            .z = self.z,
+        };
+    }
 };
 
 /// Options that control how a track begins playing.
@@ -964,13 +1118,21 @@ pub const StereoGains = extern struct {
 pub const Track = struct {
     value: *c.MIX_Track,
 
-    /// Dispose of a previously-created track.
+    /// Destroy the specified track.
     ///
     /// ## Function Parameters
     /// * `self`: The track to destroy.
     ///
+    /// ## Remarks
+    /// If the track is currently playing, it will be stopped immediately, without any fadeout.
+    /// If there is a callback set through `Track.setStoppedCallback`, it will not be called.
+    ///
+    /// If the mixer is currently mixing in another thread, this will block until it finishes.
+    /// Destroying a track from the mixer thread itself (during a callback) will cause it to be destroyed as soon as this iteration of the mixer thread is not using it;
+    /// in this scenario, destroying a track and then making futher changes to it is considered undefined behavior.
+    ///
     /// ## Thread Safety
-    /// You should not operate on the same track from multiple threads at the same time without supplying a serialization mechanism.
+    /// It is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
@@ -1011,6 +1173,108 @@ pub const Track = struct {
             mixer.value,
         );
         return Track{ .value = try errors.wrapCallNull(*c.MIX_Track, ret) };
+    }
+
+    /// Get a track's current position in 3D space.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// The track's position.
+    ///
+    /// ## Remarks
+    /// If 3D positioning isn't enabled for this track, through a call to `Track.set3dPosition`, this will return the zero vector.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn get3dPosition(
+        self: Track,
+    ) !Point3d {
+        var ret: c.MIX_Point3D = undefined;
+        try errors.wrapCallBool(c.MIX_GetTrack3DPosition(self.value, &ret));
+        return .fromSdl(ret);
+    }
+
+    /// Query the audio assigned to a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// Returns the audio if available.
+    ///
+    /// ## Remarks
+    /// This returns the `Audio` object currently assigned to track through a call to `Track.setAudio`.
+    /// If there is none assigned, or the track has an input that isn't an `Audio` (such as an `sdl3.audio.Stream` or `sdl3.io_stream.Stream`), this will return `null`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getAudio(
+        self: Track,
+    ) ?Audio {
+        const ret = c.MIX_GetTrackAudio(self.value);
+        if (ret) |val|
+            return .{ .value = val };
+        return null;
+    }
+
+    /// Query the audio stream assigned to a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// Returns the audio stream if available.
+    ///
+    /// ## Remarks
+    /// This returns the audio stream object currently assigned to track through a call to `Track.setAudioStream`.
+    /// If there is none assigned, or the track has an input that isn't an SDL_AudioStream (such as a `Audio` or `sdl3.io_stream.Stream`), this will return `null`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getAudioStream(
+        self: Track,
+    ) ?audio.Stream {
+        const ret = c.MIX_GetTrackAudioStream(self.value);
+        if (ret) |val|
+            return .{ .value = val };
+        return null;
+    }
+
+    /// Query whether a given track is fading.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// Returns less than `0` if the track is fading out, greater than `0` if fading in, `0` otherwise.
+    ///
+    /// ## Remarks
+    /// This specifically checks if the track is not stopped (paused or playing), and it is fading in or out, and returns the number of frames remaining in the fade.
+    ///
+    /// If fading out, the returned value will be negative.
+    /// When fading in, the returned value will be positive.
+    /// If not fading, this function returns zero.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getFadeFrames(
+        self: Track,
+    ) isize {
+        return @intCast(c.MIX_GetTrackFadeFrames(self.value));
     }
 
     /// Get the gain (volume) of a track.
@@ -1404,6 +1668,84 @@ pub const Version = struct {
         return @intCast(ret);
     }
 };
+
+/// Convert sample frames, at a specific sample rate, to milliseconds.
+///
+/// ## Function Parameters
+/// * `sample_rate`: The sample rate to use for conversion.
+/// * `frames`: The rate-specific sample frames to convert to milliseconds.
+///
+/// ## Return Value
+/// Returns converted number of milliseconds.
+///
+/// ## Remarks
+/// Sample frames are more precise than milliseconds, so out of necessity, this function will approximate by rounding down to the closest full millisecond.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// Version
+/// This function is available since SDL_mixer 3.0.0.
+pub fn framesToMs(
+    sample_rate: u32,
+    frames: usize,
+) !usize {
+    return @intCast(try errors.wrapCall(c.Sint64, c.MIX_FramesToMS(@intCast(sample_rate), @intCast(frames)), -1));
+}
+
+/// Report the name of a specific audio decoders.
+///
+/// ## Function Parameters
+/// * `index`: The index of the decoder to query.
+///
+/// ## Return Value
+/// Returns a UTF-8 (really, ASCII) string of the decoder's name.
+///
+/// ## Remarks
+/// An audio decoder is what turns specific audio file formats into usable PCM data.
+/// For example, there might be an MP3 decoder, or a WAV decoder, etc. SDL mixer probably has several decoders built in.
+///
+/// The names are capital English letters and numbers, low-ASCII.
+/// They don't necessarily map to a specific file format; Some decoders, like "XMP" operate on multiple file types, and more than one decoder might handle the same file type,
+/// like "DRMP3" vs "MPG123". Note that in that last example, neither decoder is called "MP3".
+///
+/// The index of a specific decoder is decided during `init` and does not change until the library is deinitialized.
+/// Valid indices are between zero and the return value of `getNumAudioDecoders`.
+///
+/// The returned pointer is const memory owned by SDL mixer; do not free it.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// ## Version
+/// This function is available since SDL_mixer 3.0.0.
+pub fn getAudioDecoder(
+    index: usize,
+) ![:0]const u8 {
+    return errors.wrapCallCString(c.MIX_GetAudioDecoder(@intCast(index)));
+}
+
+/// Report the number of audio decoders available for use.
+///
+/// ## Return Value
+/// Returns the number of decoders available.
+///
+/// ## Remarks
+/// An audio decoder is what turns specific audio file formats into usable PCM data.
+/// For example, there might be an MP3 decoder, or a WAV decoder, etc. SDL mixer probably has several decoders built in.
+///
+/// The return value can be used to call `getAudioDecoder` in a loop.
+///
+/// The number of decoders available is decided during `init` and does not change until the library is deinitialized.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// ## Version
+/// This function is available since SDL_mixer 3.0.0.
+pub fn getNumAudioDecoders() usize {
+    return @intCast(c.MIX_GetNumAudioDecoders());
+}
 
 /// Initialize the SDL mixer library.
 ///
