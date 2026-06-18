@@ -497,6 +497,51 @@ pub const Audio = extern struct {
         return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
     }
 
+    /// Load raw PCM data from a memory buffer without making a copy.
+    ///
+    /// ## Function Parameters
+    /// * `mixer`: A mixer this audio is intended to be used with.
+    /// * `data`: The buffer where the raw PCM data lives.
+    /// * `spec`: What format the raw data is in.
+    /// * `free_when_done`: If true, data will be given to `sdl3.free` when the audio is destroyed.
+    ///
+    /// ## Return Value
+    /// Returns an audio object that can be used to make sound on a mixer.
+    ///
+    /// ## Remarks
+    /// This buffer must live for the entire time the returned audio lives, as the mixer will access the buffer whenever it needs to mix more data.
+    ///
+    /// This function is meant to maximize efficiency: if the data is already in memory and can remain there, don't copy it.
+    /// But it can also lead to some interesting tricks, like changing the buffer's contents to alter multiple playing tracks at once.
+    /// (But, of course, be careful when being too clever).
+    ///
+    /// Audio objects can be shared between multiple mixers.
+    /// The mixer parameter just suggests the most likely mixer to use this audio, in case some optimization might be applied, but this is not required, and a `null` mixer may be specified.
+    ///
+    /// If `free_when_done` is true, SDL mixer will call `sdl3.free(data)` when the returned audio is eventually destroyed.
+    /// This can be useful when the data is not static, but rather composed dynamically for this specific audio and simply wants to avoid the extra copy.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn initRawNoCopy(
+        mixer: ?Mixer,
+        data: []const u8,
+        spec: audio.Spec,
+        free_when_done: bool,
+    ) !Audio {
+        const ret = c.MIX_LoadRawAudioNoCopy(
+            if (mixer) |val| val.value else null,
+            data.ptr,
+            @intCast(data.len),
+            &spec.toSdl(),
+            free_when_done,
+        );
+        return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
+    }
+
     /// Create an audio object that produces a sine wave.
     ///
     /// ## Function Parameters
@@ -1525,6 +1570,29 @@ pub const Mixer = struct {
     ) !void {
         return errors.wrapCallBool(c.MIX_StopTag(self.value, tag.ptr, @intCast(fade_out_ms)));
     }
+
+    /// Unlock a mixer previously locked by a call to `Mixer.lock`.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to unlock.
+    ///
+    /// ## Remarks
+    /// While locked, the mixer will not be able to mix more audio or change its internal state another thread.
+    /// Those other threads will block until the mixer is unlocked again.
+    ///
+    /// Under the hood, this function calls `mutex.Mutex.lock`, so all the same rules apply: the lock can be recursive,
+    /// it must be unlocked the same number of times from the same thread that locked it, etc.
+    ///
+    /// ## Thread Safety
+    /// This call must be paired with a previous `Mixer.lock` call on the same thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn unlock(
+        self: Mixer,
+    ) void {
+        c.MIX_UnlockMixer(self.value);
+    }
 };
 
 /// 3D coordinates for `track.set3dPosition`.
@@ -1671,35 +1739,31 @@ pub const Track = struct {
         );
     }
 
-    /// Create a new track on a mixer.
+    /// Convert sample frames for a track's current format to milliseconds.
     ///
     /// ## Function Parameters
-    /// * `mixer`: The mixer to create the track on.
+    /// * `self`: The track to query.
+    /// * `frames`: The track-specific sample frames to convert to milliseconds.
     ///
     /// ## Return Value
-    /// Returns a new `mixer.Track`. The caller must call `deinit()` on it when done.
+    /// Returns converted number of milliseconds.
     ///
     /// ## Remarks
-    /// A track provides a single source of audio.
-    /// All currently-playing tracks will be processed and mixed together to form the final output from the mixer.
+    /// This calculates time based on the track's current input format, which can change when its input does,
+    /// and also if that input changes formats mid-stream (for example, if decoding a file that is two MP3s concatenated together).
     ///
-    /// There are no limits to the number of tracks one may create, beyond running out of memory,
-    /// but in normal practice there are a small number of tracks that are reused between all loaded audio as appropriate.
-    ///
-    /// Tracks are unique to a specific `Mixer` and can't be transferred between them.
+    /// Sample frames are more precise than milliseconds, so out of necessity, this function will approximate by rounding down to the closest full millisecond.
     ///
     /// ## Thread Safety
     /// It is safe to call this function from any thread.
     ///
     /// ## Version
     /// This function is available since SDL_mixer 3.0.0.
-    pub fn init(
-        mixer: Mixer,
-    ) !Track {
-        const ret = c.MIX_CreateTrack(
-            mixer.value,
-        );
-        return Track{ .value = try errors.wrapCallNull(*c.MIX_Track, ret) };
+    pub fn framesToMs(
+        self: Track,
+        frames: usize,
+    ) !usize {
+        return @intCast(try errors.wrapCall(c.Sint64, c.MIX_TrackFramesToMS(self.value, @intCast(frames)), -1));
     }
 
     /// Get a track's current position in 3D space.
@@ -1994,6 +2058,37 @@ pub const Track = struct {
         return @as([*][*:0]const u8, @ptrCast(@alignCast(c.MIX_GetTrackTags(self.value, &num))))[0..@intCast(num)];
     }
 
+    /// Create a new track on a mixer.
+    ///
+    /// ## Function Parameters
+    /// * `mixer`: The mixer to create the track on.
+    ///
+    /// ## Return Value
+    /// Returns a new `mixer.Track`. The caller must call `deinit()` on it when done.
+    ///
+    /// ## Remarks
+    /// A track provides a single source of audio.
+    /// All currently-playing tracks will be processed and mixed together to form the final output from the mixer.
+    ///
+    /// There are no limits to the number of tracks one may create, beyond running out of memory,
+    /// but in normal practice there are a small number of tracks that are reused between all loaded audio as appropriate.
+    ///
+    /// Tracks are unique to a specific `Mixer` and can't be transferred between them.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn init(
+        mixer: Mixer,
+    ) !Track {
+        const ret = c.MIX_CreateTrack(
+            mixer.value,
+        );
+        return Track{ .value = try errors.wrapCallNull(*c.MIX_Track, ret) };
+    }
+
     /// Query if a track is currently playing.
     ///
     /// ## Function Parameters
@@ -2045,6 +2140,31 @@ pub const Track = struct {
         return c.MIX_TrackPaused(
             self.value,
         );
+    }
+
+    /// Convert milliseconds to sample frames for a track's current format.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    /// * `ms`: The milliseconds to convert to track-specific sample frames.
+    ///
+    /// ## Return Value
+    /// Returns converted number of sample frames.
+    ///
+    /// ## Remarks
+    /// This calculates time based on the track's current input format, which can change when its input does,
+    /// and also if that input changes formats mid-stream (for example, if decoding a file that is two MP3s concatenated together).
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn msToFrames(
+        self: Track,
+        ms: usize,
+    ) !usize {
+        return @intCast(try errors.wrapCall(c.Sint64, c.MIX_TrackMSToFrames(self.value, @intCast(ms)), -1));
     }
 
     /// Pause a currently-playing track.
@@ -2212,6 +2332,48 @@ pub const Track = struct {
         const ret = c.MIX_SetTrackAudio(
             self.value,
             if (audio_data) |val| val.value else null,
+        );
+        return errors.wrapCallBool(ret);
+    }
+
+    /// Set a track's input to an `audio.Stream`.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track on which to set a new audio input.
+    /// * `stream`: The audio stream to use as the track's input.
+    ///
+    /// ## Remarks
+    /// Using an audio stream allows the application to generate any type of audio, in any format, possibly procedurally or on-demand, and mix in with all other tracks.
+    ///
+    /// When a track uses an audio stream, it will call `audio.Stream.getData` as it needs more audio to mix.
+    /// The app can either buffer data to the stream ahead of time, or set a callback on the stream to provide data as needed.
+    /// Please refer to SDL's documentation for details.
+    ///
+    /// A given audio stream may only be assigned to a single track at a time; duplicate assignments won't return an error,
+    /// but assigning a stream to multiple tracks will cause each track to read from the stream arbitrarily, causing confusion and incorrect mixing.
+    ///
+    /// Once a track has a valid input, it can start mixing sound by calling `Track.play`, or possibly `Mixer.playTag`.
+    ///
+    /// Calling this function with a `null` audio stream is legal, and removes any input from the track.
+    /// If the track was currently playing, the next time the mixer runs, it'll notice this and mark the track as stopped, calling any assigned `TrackStoppedCallback`.
+    ///
+    /// It is legal to change the input of a track while it's playing, however some states, like loop points, may cease to make sense with the new audio.
+    /// In such a case, one can call `Track.play` again to adjust parameters.
+    ///
+    /// The provided audio stream must remain valid until the track no longer needs it (either by changing the track's input or destroying the track).
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setAudioStream(
+        self: Track,
+        stream: ?audio.Stream,
+    ) !void {
+        const ret = c.MIX_SetTrackAudioStream(
+            self.value,
+            if (stream) |val| val.value else null,
         );
         return errors.wrapCallBool(ret);
     }
