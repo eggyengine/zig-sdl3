@@ -27,7 +27,7 @@ pub fn main(
     try log_app.logInfo("Using SDL_mixer {d}.{d}.{d}", .{ compiled_version.getMajor(), compiled_version.getMinor(), compiled_version.getMicro() });
     try log_app.logInfo("Linked against SDL_mixer {d}.{d}.{d}", .{ linked_version.getMajor(), linked_version.getMinor(), linked_version.getMicro() });
 
-    // Open a mixer on the default playback device, letting SDL_mixer pick the format.
+    // Open a mixer on the default playback device, letting SDL mixer pick the format.
     const mixer = try sdl3.mixer.Mixer.initDevice(sdl3.audio.Device.default_playback, null);
     defer mixer.deinit();
 
