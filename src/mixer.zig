@@ -923,6 +923,25 @@ pub const LoopCount = union(enum) {
     num: usize,
     /// There are infinite loops.
     infinite: void,
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(
+        value: c_int,
+    ) LoopCount {
+        if (value == -1)
+            return .{ .infinite = {} };
+        return .{ .num = @intCast(value) };
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(
+        self: LoopCount,
+    ) c_int {
+        return switch (self) {
+            .num => |num| @intCast(num),
+            .infinite => -1,
+        };
+    }
 };
 
 /// An opaque object that represents a mixer.
@@ -1699,6 +1718,26 @@ pub const StereoGains = extern struct {
     comptime {
         errors.assertStructsEqual(@This(), c.MIX_StereoGains);
     }
+
+    /// Convert from an SDL value.
+    pub fn fromSdl(
+        value: c.MIX_StereoGains,
+    ) StereoGains {
+        return .{
+            .left = value.left,
+            .right = value.right,
+        };
+    }
+
+    /// Convert to an SDL value.
+    pub fn toSdl(
+        self: StereoGains,
+    ) c.MIX_StereoGains {
+        return .{
+            .left = self.left,
+            .right = self.right,
+        };
+    }
 };
 
 /// An opaque object that represents a source of sound output to be mixed.
@@ -1945,9 +1984,7 @@ pub const Track = struct {
         self: Track,
     ) LoopCount {
         const ret = c.MIX_GetTrackLoops(self.value);
-        if (ret == -1)
-            return .{ .infinite = {} };
-        return .{ .num = @intCast(ret) };
+        return LoopCount.fromSdl(ret);
     }
 
     /// Get the `Mixer` that owns a `Track`.
@@ -2467,6 +2504,181 @@ pub const Track = struct {
             if (group) |val| val.value else null,
         );
         return errors.wrapCallBool(ret);
+    }
+
+    /// Change the number of times a currently-playing track will loop.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to configure.
+    /// * `loops`: New number of times to loop. Zero to disable looping.
+    ///
+    /// ## Remarks
+    /// This replaces any previously-set remaining loops.
+    /// A value of `1` will loop to the start of playback one time.
+    /// Zero will not loop at all.
+    /// If the input is not seekable and `loop` isn't zero, this function will report success but the track will stop at the point it should loop.
+    ///
+    /// The new loop count replaces any previous state, even if the track has already looped.
+    ///
+    /// This has no effect on a track that is stopped, or rather, starting a stopped track later will set a new loop count, replacing this value.
+    /// Stopped tracks can specify a loop count while starting via `play_loops`.
+    /// This function is intended to alter that count in the middle of playback.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setLoops(
+        self: Track,
+        loops: LoopCount,
+    ) !void {
+        return errors.wrapCallBool(c.MIX_SetTrackLoops(self.value, loops.toSdl()));
+    }
+
+    /// Set the current output channel map of a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to change.
+    /// * `channel_map`: The new channel map, `null` to reset to default.
+    ///
+    /// ## Remarks
+    /// Channel maps are optional; most things do not need them, instead passing data in the order that SDL expects.
+    ///
+    /// The output channel map reorders track data after transformations and before it is mixed into a mixer group.
+    /// This can be useful for reversing stereo channels, for example.
+    ///
+    /// Each item in the array represents an input channel, and its value is the channel that it should be remapped to.
+    /// To reverse a stereo signal's left and right values, you'd have an array of `.{ 1, 0 }`.
+    /// It is legal to remap multiple channels to the same thing, so `.{ 1, 1 }` would duplicate the right channel to both channels of a stereo signal.
+    /// An element in the channel map set to `-1` instead of a valid channel will mute that channel, setting it to a silence value.
+    ///
+    /// You cannot change the number of channels through a channel map, just reorder/mute them.
+    ///
+    /// Tracks default to no remapping applied.
+    /// Passing a `null` channel map is legal, and turns off remapping.
+    ///
+    /// SDL mixer will copy the channel map; the caller does not have to save this array after this call.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    ///## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setOutputChannelMap(
+        self: Track,
+        channel_map: ?[]const c_int,
+    ) !void {
+        return errors.wrapCallBool(c.MIX_SetTrackOutputChannelMap(self.value, if (channel_map) |val| val.ptr else null, if (channel_map) |val| @intCast(val.len) else 0));
+    }
+
+    /// Seek a playing track to a new position in its input.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to change.
+    /// * `frames`: The sample frame position to seek to.
+    ///
+    /// ## Remarks
+    /// Not to be confused with `Track.set3dPosition`, which is positioning of the track in 3D space, not the playback position of its audio data.
+    ///
+    /// On a playing track, the next time the mixer runs, it will start mixing from the new position.
+    ///
+    /// Position is defined in sample frames of decoded audio, not units of time, so that sample-perfect mixing can be achieved.
+    /// To instead operate in units of time, use `Track.msToFrames` to get the approximate sample frames for a given tick.
+    ///
+    /// This function requires an input that can seek (so it can not be used if the input was set with `Track.setAudioStream`), and a audio file format that allows seeking.
+    /// SDL mixer's decoders for some file formats do not offer seeking, or can only seek to times, not exact sample frames,
+    /// in which case the final position may be off by some amount of sample frames.
+    /// Please check your audio data and file bug reports if appropriate.
+    ///
+    /// It's legal to call this function on a track that is stopped, but a future call to `Track.play` will reset the start position anyhow.
+    /// Paused tracks will resume at the new input position.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setPlaybackPosition(
+        self: Track,
+        frames: usize,
+    ) !void {
+        return errors.wrapCallBool(c.MIX_SetTrackPlaybackPosition(self.value, @intCast(frames)));
+    }
+
+    /// Set a track's input to an SDL IO stream providing raw PCM data.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track on which to set a new audio input.
+    /// * `io`: The new i/o stream to use as the track's input.
+    /// * `spec`: The format of the PCM data that the SDL IO stream will provide.
+    /// * `close_io`: If true, close the stream when done with it.
+    ///
+    /// ## Remarks
+    /// This is not the recommended way to set a track's input, but this can be useful for a very specific scenario: a large file, to be played once,
+    /// that must be read from disk in small chunks as needed.
+    /// In most cases, however, it is preferable to create an `Audio` ahead of time and use `Track.setAudio` instead.
+    ///
+    /// Also, an `Track.setAudioStream` can also provide raw PCM audio to a track, via an `audio.Stream`,
+    /// which might be preferable unless the data is already coming directly from an SDL IO stream.
+    ///
+    /// The stream supplied here should provide an audio in raw PCM format.
+    ///
+    /// A given IO stream may only be assigned to a single track at a time; duplicate assignments won't return an error,
+    /// but assigning a stream to multiple tracks will cause each track to read from the stream arbitrarily, causing confusion and incorrect mixing.
+    ///
+    /// Once a track has a valid input, it can start mixing sound by calling `Track.play` or possibly `Mixer.playTag`.
+    ///
+    /// Calling this function with a `null` stream is legal, and removes any input from the track.
+    /// If the track was currently playing, the next time the mixer runs, it'll notice this and mark the track as stopped, calling any assigned `TrackStoppedCallback`.
+    ///
+    /// It is legal to change the input of a track while it's playing, however some states, like loop points, may cease to make sense with the new audio.
+    /// In such a case, one can call `Track.play` again to adjust parameters.
+    ///
+    /// The provided stream must remain valid until the track no longer needs it (either by changing the track's input or destroying the track).
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setRawIoStream(
+        self: Track,
+        io: ?io_stream.Stream,
+        spec: audio.Spec,
+        close_io: bool,
+    ) !void {
+        return errors.wrapCallBool(c.MIX_SetTrackRawIOStream(self.value, if (io) |val| val.value else null, &spec.toSdl(), close_io));
+    }
+
+    /// Force a track to stereo output, with optionally left/right panning.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to adjust.
+    /// * `gains`: The per-channel gains, or `null` to disable spatialization.
+    ///
+    /// ## Remarks
+    /// This will cause the output of the track to convert to stereo, and then mix it only onto the Front Left and Front Right speakers, regardless of the speaker configuration.
+    /// The left and right channels are modulated by gains, which can be used to produce panning effects.
+    /// This function may be called to adjust the gains at any time.
+    ///
+    /// If gains is not `null`, this track will be switched into forced-stereo mode.
+    /// If gains is `null`, this will disable spatialization (both the forced-stereo mode of this function and full 3D spatialization of `Track.setTrack3dPosition`).
+    ///
+    /// Negative gains are clamped to zero; there is no clamp for maximum, so one could set the value > 1 to make a channel louder.
+    ///
+    /// The track's 3D position, reported by `Track.get3dPosition`, will be reset to `(0, 0, 0)`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setStereo(
+        self: Track,
+        gains: ?StereoGains,
+    ) !void {
+        try errors.wrapCallBool(c.MIX_SetTrackStereo(self.value, if (gains) |val| &val.toSdl() else null));
     }
 
     /// Halt a currently-playing track, possibly fading out over time.
