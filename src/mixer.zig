@@ -2506,6 +2506,49 @@ pub const Track = struct {
         return errors.wrapCallBool(ret);
     }
 
+    /// Set a track's input to an IO stream.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track on which to set a new audio input.
+    /// * `io`: The new i/o stream to use as the track's input.
+    /// * `close_io`: If true, close the stream when done with it.
+    ///
+    /// ## Remarks
+    /// This is not the recommended way to set a track's input, but this can be useful for a very specific scenario: a large file,
+    /// to be played once, that must be read from disk in small chunks as needed.
+    /// In most cases, however, it is preferable to create an `Audio` ahead of time and use `Track.setAudio` instead.
+    ///
+    /// The stream supplied here should provide an audio file in a supported format.
+    /// SDL_mixer will parse it during this call to make sure it's valid, and then will read file data from the stream as it needs to decode more during mixing.
+    ///
+    /// The stream must be able to seek through the complete set of data, or this function will fail.
+    ///
+    /// A given IOStream may only be assigned to a single track at a time; duplicate assignments won't return an error,
+    /// but assigning a stream to multiple tracks will cause each track to read from the stream arbitrarily, causing confusion, incorrect mixing, or failure to decode.
+    ///
+    /// Once a track has a valid input, it can start mixing sound by calling `Track.play`, or possibly `Mixer.playTag`.
+    ///
+    /// Calling this function with a `null` stream is legal, and removes any input from the track.
+    /// If the track was currently playing, the next time the mixer runs, it'll notice this and mark the track as stopped, calling any assigned `TrackStoppedCallback`.
+    ///
+    /// It is legal to change the input of a track while it's playing, however some states, like loop points, may cease to make sense with the new audio.
+    /// In such a case, one can call `Track.play` again to adjust parameters.
+    ///
+    /// The provided stream must remain valid until the track no longer needs it (either by changing the track's input or destroying the track).
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setIoStream(
+        self: Track,
+        io: ?io_stream.Stream,
+        close_io: bool,
+    ) !void {
+        return errors.wrapCallBool(c.MIX_SetTrackIOStream(self.value, if (io) |val| val.value else null, close_io));
+    }
+
     /// Change the number of times a currently-playing track will loop.
     ///
     /// ## Function Parameters
@@ -2679,6 +2722,43 @@ pub const Track = struct {
         gains: ?StereoGains,
     ) !void {
         try errors.wrapCallBool(c.MIX_SetTrackStereo(self.value, if (gains) |val| &val.toSdl() else null));
+    }
+
+    /// A callback that fires when a track is stopped.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to assign this callback to.
+    /// * `UserData`: App provided user data type.
+    /// * `cb`: The function to call when the track stops.
+    /// * `user_data`: App provided user data.
+    ///
+    /// ## Remarks
+    /// When a track completes playback, either because it ran out of data to mix (and all loops were completed as well), or it was explicitly stopped by the app,
+    /// it will fire the callback specified here.
+    ///
+    /// Each track has its own unique callback.
+    ///
+    /// Passing a `null` callback here is legal; it disables this track's callback.
+    ///
+    /// Pausing a track will not fire the callback, nor will the callback fire on a playing track that is being destroyed.
+    ///
+    /// It is legal to adjust the track, including changing its input and restarting it.
+    /// If this is done because it ran out of data in the middle of mixing, the mixer will start mixing the new track state in its current run without any gap in the audio.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setStoppedCallback(
+        self: Track,
+        comptime UserData: type,
+        comptime cb: ?TrackStoppedCallback(UserData),
+        user_data: ?*UserData,
+    ) !void {
+        const Cb = struct {
+            fn run(c_user_data: ?*anyopaque, c_track: *c.MIX_Track) void {
+                cb.?(@ptrCast(@alignCast(c_user_data)), .{ .value = c_track });
+            }
+        };
+        return errors.wrapCallBool(c.MIX_SetTrackStoppedCallback(self.value, if (cb == null) null else Cb.run, @ptrCast(@alignCast(user_data))));
     }
 
     /// Halt a currently-playing track, possibly fading out over time.
