@@ -24,7 +24,7 @@ comptime {
 ///
 /// The audio data passed through here is not const data; the app is permitted to change it in any way it likes, and those changes will propagate through the mixing pipeline.
 ///
-/// An audiospec is provided.
+/// An audio spec is provided.
 /// Different groups might be in different formats, and an app needs to be able to handle that,
 /// but SDL mixer always does its mixing work in 32-bit float samples, even if the inputs or final output are not floating point.
 /// As such, `spec.format` will always be `floating_32_bit` and pcm hardcoded to be a float pointer.
@@ -1495,6 +1495,37 @@ pub const Mixer = struct {
         return errors.wrapCallBool(ret);
     }
 
+    /// Set a callback that fires when all mixing has completed.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to assign this callback to.
+    /// * `UserData`: Type of user data for the callback.
+    /// * `cb`: The function to call when the mixer mixes, may be `null`.
+    /// * `user_data`: App provided user data.
+    pub fn setPostMixCallback(
+        self: Mixer,
+        comptime UserData: type,
+        comptime cb: ?PostMixCallback(UserData),
+        user_data: ?*anyopaque,
+    ) !void {
+        const Cb = struct {
+            fn run(
+                c_user_data: ?*anyopaque,
+                c_mixer: [*c]c.MIX_Mixer,
+                c_spec: [*c]const c.SDL_AudioSpec,
+                c_pcm: [*c]f32,
+                c_samples: c_int,
+            ) callconv(.c) void {
+                cb.?(@ptrCast(@alignCast(c_user_data)), .{ .value = c_mixer }, audio.Spec.fromSdl(c_spec), c_pcm[0..@intCast(c_samples)]);
+            }
+        };
+        return errors.wrapCallBool(c.MIX_SetPostMixCallback(
+            self.value,
+            if (cb != null) &Cb.run else null,
+            @ptrCast(@alignCast(user_data)),
+        ));
+    }
+
     /// Set the gain control of all tracks with a specific tag.
     ///
     /// ## Function Parameters
@@ -2415,6 +2446,54 @@ pub const Track = struct {
         return errors.wrapCallBool(ret);
     }
 
+    /// Set a callback that fires when the mixer has transformed a track's audio.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to assign this callback to.
+    /// * `UserData`: Type of user data to pass to the callback.
+    /// * `cb`: The function to call when the track mixes, may be `null`.
+    /// * `user_data`: User data to pass to the callback.
+    ///
+    /// ## Remarks
+    /// As a track needs to mix more data, it pulls from its input (an audio, an audio stream, etc).
+    /// This input might be a compressed file format, like MP3, so a little more data is uncompressed from it.
+    ///
+    /// Once the track has PCM data to start operating on, and its raw callback has completed, it will begin to transform the audio: gain, fading, frequency ratio, 3D positioning, etc.
+    ///
+    /// A callback can be fired after all these transformations, but before the transformed data is mixed into other tracks.
+    /// This lets an app view the data at the last moment that it is still a part of this track.
+    /// It can also change the data in any way it pleases during this callback, and the mixer will continue as if this data came directly from the input.
+    ///
+    /// Each track has its own unique cooked callback.
+    ///
+    /// Passing a `null` callback here is legal; it disables this track's callback.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setCookedCallback(
+        self: Track,
+        comptime UserData: type,
+        comptime cb: ?TrackMixCallback(UserData),
+        user_data: ?*anyopaque,
+    ) !void {
+        const Cb = struct {
+            fn run(
+                c_user_data: ?*anyopaque,
+                c_track: [*c]c.MIX_Track,
+                c_spec: [*c]const c.SDL_AudioSpec,
+                c_pcm: [*c]f32,
+                c_samples: c_int,
+            ) callconv(.c) void {
+                cb.?(@ptrCast(@alignCast(c_user_data)), .{ .value = c_track }, audio.Spec.fromSdl(c_spec), c_pcm[0..@intCast(c_samples)]);
+            }
+        };
+        return errors.wrapCallBool(c.MIX_SetTrackCookedCallback(
+            self.value,
+            if (cb != null) &Cb.run else null,
+            @ptrCast(@alignCast(user_data)),
+        ));
+    }
+
     /// Change the frequency ratio of a track.
     ///
     /// ## Function Parameters
@@ -2649,6 +2728,52 @@ pub const Track = struct {
         return errors.wrapCallBool(c.MIX_SetTrackPlaybackPosition(self.value, @intCast(frames)));
     }
 
+    /// Set a callback that fires when a track has initial decoded audio.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to assign this callback to.
+    /// * `UserData`: The type for specifying user data.
+    /// * `cb`: The function to call when the track mixes, may be `null`.
+    /// * `user_data`: User data to pass to the callback.
+    ///
+    /// ## Remarks
+    /// As a track needs to mix more data, it pulls from its input (an `Audio`, an `audio.Stream`, etc).
+    /// This input might be a compressed file format, like MP3, so a little more data is uncompressed from it.
+    ///
+    /// Once the track has PCM data to start operating on, it can fire a callback before any changes to the raw PCM input have happened.
+    /// This lets an app view the data before it has gone through transformations such as gain, 3D positioning, fading, etc.
+    /// It can also change the data in any way it pleases during this callback, and the mixer will continue as if this data came directly from the input.
+    ///
+    /// Each track has its own unique raw callback.
+    ///
+    /// Passing a `null` callback here is legal; it disables this track's callback.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn setRawCallback(
+        self: Track,
+        comptime UserData: type,
+        comptime cb: ?TrackMixCallback(UserData),
+        user_data: ?*UserData,
+    ) !void {
+        const Cb = struct {
+            fn run(
+                c_user_data: ?*anyopaque,
+                c_track: [*c]c.MIX_Track,
+                c_spec: [*c]const c.SDL_AudioSpec,
+                c_pcm: [*c]f32,
+                c_samples: c_int,
+            ) callconv(.c) void {
+                cb.?(@ptrCast(@alignCast(c_user_data)), .{ .value = c_track }, audio.Spec.fromSdl(c_spec), c_pcm[0..@intCast(c_samples)]);
+            }
+        };
+        return errors.wrapCallBool(c.MIX_SetTrackRawCallback(
+            self.value,
+            if (cb != null) &Cb.run else null,
+            @ptrCast(@alignCast(user_data)),
+        ));
+    }
+
     /// Set a track's input to an SDL IO stream providing raw PCM data.
     ///
     /// ## Function Parameters
@@ -2754,7 +2879,7 @@ pub const Track = struct {
         user_data: ?*UserData,
     ) !void {
         const Cb = struct {
-            fn run(c_user_data: ?*anyopaque, c_track: *c.MIX_Track) void {
+            fn run(c_user_data: ?*anyopaque, c_track: [*c]c.MIX_Track) callconv(.c) void {
                 cb.?(@ptrCast(@alignCast(c_user_data)), .{ .value = c_track });
             }
         };
