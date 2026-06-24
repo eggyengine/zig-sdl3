@@ -1502,6 +1502,18 @@ pub const Mixer = struct {
     /// * `UserData`: Type of user data for the callback.
     /// * `cb`: The function to call when the mixer mixes, may be `null`.
     /// * `user_data`: App provided user data.
+    ///
+    /// ## Remarks
+    /// After all mixer groups have processed, their buffers are mixed together into a single buffer for the final output, at which point a callback can be fired.
+    /// This lets an app view the data at the last moment before mixing completes.
+    /// It can also change the data in any way it pleases during this callback, and the mixer will continue as if this data is the final output.
+    ///
+    /// Each mixer has its own unique callback.
+    ///
+    /// Passing a `null` callback here is legal; it disables this mixer's callback.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
     pub fn setPostMixCallback(
         self: Mixer,
         comptime UserData: type,
@@ -1691,20 +1703,38 @@ pub const Point3d = extern struct {
 ///
 /// ## Remarks
 /// All fields are optional; a `null` field uses SDL_mixer's default behavior for that setting.
-/// This maps to the `MIX_PROP_PLAY_*` properties that `Track.play()` accepts.
 ///
 /// ## Version
 /// This type is provided by zig-sdl3.
 pub const PlayOptions = struct {
     /// Number of times to loop the track after the first play.
     /// The default is `0`.
-    loops: ?i64 = null,
+    loops: ?LoopCount = null,
+    /// Mix at most to this sample frame position in the track.
+    /// This will be treated as if the input reach EOF at this point in the audio file.
+    /// If inner is `null`, mix all available audio without a limit.
+    /// Default `null`.
+    max_frame: ?struct { value: ?usize } = null,
+    /// Mix at most to this millisecond position in the track.
+    /// This will be treated as if the input reach EOF at this point in the audio file.
+    /// The `max_frame` property will be preferred if specified.
+    /// If inner is `null`, mix all available audio without a limit.
+    /// Default `null`.
+    max_milliseconds: ?struct { value: ?usize } = null,
+    /// Start mixing from this sample frame position in the track's input.
+    /// A `value <= 0` will begin from the start of the track's input.
+    /// If the input is not seekable and this `value > 0`, the function will report failure.
+    /// Default `0`.
+    start_frame: ?usize = null,
+    /// Start mixing from this millisecond position in the track's input.
+    /// The `start_frame` property will be preferred if specified.
+    /// A `value <= 0` will begin from the start of the track's input.
+    /// If the input is not seekable and this `value > 0`, the function will report failure.
+    /// Default `0`.
+    start_millisecond: ?usize = null,
+
     /// Fade the track in over this many milliseconds.
     fade_in_milliseconds: ?i64 = null,
-    /// Start playback this many milliseconds into the audio.
-    start_millisecond: ?i64 = null,
-    /// Stop playback after this many milliseconds have been mixed.
-    max_milliseconds: ?i64 = null,
 
     /// Convert to an SDL properties group.
     pub fn toProperties(
