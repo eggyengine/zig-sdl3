@@ -1722,19 +1722,77 @@ pub const PlayOptions = struct {
     /// Default `null`.
     max_milliseconds: ?struct { value: ?usize } = null,
     /// Start mixing from this sample frame position in the track's input.
-    /// A `value <= 0` will begin from the start of the track's input.
+    /// A `value == 0` will begin from the start of the track's input.
     /// If the input is not seekable and this `value > 0`, the function will report failure.
     /// Default `0`.
     start_frame: ?usize = null,
     /// Start mixing from this millisecond position in the track's input.
     /// The `start_frame` property will be preferred if specified.
-    /// A `value <= 0` will begin from the start of the track's input.
+    /// A `value == 0` will begin from the start of the track's input.
     /// If the input is not seekable and this `value > 0`, the function will report failure.
     /// Default `0`.
     start_millisecond: ?usize = null,
-
-    /// Fade the track in over this many milliseconds.
-    fade_in_milliseconds: ?i64 = null,
+    /// If the track is looping, this is the sample frame position that the track will loop back to; this lets one play an intro at the start of a track on the first iteration,
+    /// but have a loop point somewhere in the middle thereafter.
+    /// A value of `0` will begin the loop from the start of the track's input.
+    /// Default `0`.
+    loop_start_frame: ?usize = null,
+    /// If the track is looping, this is the millisecond position that the track will loop back to; this lets one play an intro at the start of a track on the first iteration,
+    /// but have a loop point somewhere in the middle thereafter.
+    /// The `loop_start_frame` property will be preferred if specified.
+    /// A value of `0` will begin the loop from the start of the track's input.
+    /// Default `0`.
+    loop_start_millisecond: ?usize = null,
+    /// The number of sample frames over which to fade in the newly-started track.
+    /// The track will begin mixing silence and reach full volume smoothly over this many sample frames.
+    /// If the track loops before the fade-in is complete, it will continue to fade correctly from the loop point.
+    /// A value of `0` will disable fade-in, so the track starts mixing at full volume.
+    /// Default `0`.
+    fade_in_frames: ?usize = null,
+    /// The number of milliseconds over which to fade in the newly-started track.
+    /// The track will begin mixing silence and reach full volume smoothly over this many sample frames.
+    /// The `fade_in_frames` property will be preferred if specified.
+    /// If the track loops before the fade-in is complete, it will continue to fade correctly from the loop point.
+    /// A value of `0` will disable fade-in, so the track starts mixing at full volume.
+    /// Default `0`.
+    fade_in_milliseconds: ?usize = null,
+    /// If fading in, start fading from this volume level.
+    /// `0` is silence and `1` is full volume, every in between is a linear change in gain.
+    /// The specified value will be clamped between `0` and `1`.
+    /// Default `0`.
+    fade_in_start_gain: ?f32 = null,
+    /// At the end of mixing this track, after all loops are complete, append this many sample frames of silence as if it were part of the audio file.
+    /// This allows for apps to implement effects in callbacks, like reverb, that need to generate samples past the end of the stream's audio,
+    /// or perhaps introduce a delay before starting a new sound on the track without having to manage it directly.
+    /// A value of `0` generates no silence before stopping the track.
+    /// Default `0`.
+    append_silence_frames: ?usize = null,
+    /// At the end of mixing this track, after all loops are complete, append this many milliseconds of silence as if it were part of the audio file.
+    /// This allows for apps to implement effects in callbacks, like reverb, that need to generate samples past the end of the stream's audio,
+    /// or perhaps introduce a delay before starting a new sound on the track without having to manage it directly.
+    /// The `append_silence_frames` property will be preferred if specified.
+    /// A value of `0` generates no silence before stopping the track.
+    /// Default `0`.
+    append_silence_milliseconds: ?usize = null,
+    /// If `true`, when input is completely consumed for the track, the mixer will mark the track as stopped (and call any appropriate `TrackStoppedCallback`, etc); to play more,
+    /// the track will need to be restarted.
+    /// If false, the track will just not contribute to the mix, but it will not be marked as stopped.
+    /// There may be clever logic tricks this exposes generally, but this property is specifically useful when the track's input is an `audio.Stream` assigned via `Track.setAudioStream`.
+    /// Setting this property to true can be useful when pushing a complete piece of audio to the stream that has a definite ending,
+    /// as the track will operate like any other audio was applied.
+    /// Setting to false means as new data is added to the stream, the mixer will start using it as soon as possible,
+    /// which is useful when audio should play immediately as it drips in: new VoIP packets, etc.
+    /// Note that in this situation, if the audio runs out when needed, there will be gaps in the mixed output, so try to buffer enough data to avoid this when possible.
+    /// Note that a track is not consider exhausted until all its loops and appended silence have been mixed (and also, that loops don't mean anything when the input is an `audio.Stream`).
+    /// Default `true`.
+    halt_when_exhausted: ?bool = null,
+    /// This is a special-case property that most apps can ignore.
+    /// For mod file formats, start mixing from a specific "order" index instead of the start of the file.
+    /// A `null` value will cause this property to be ignored.
+    /// If the decoder doesn't support this property, it will also be ignored.
+    /// If this property is not ignored, the `start_frame` and `start_millisecond` properties will be ignored instead.
+    /// Default `null`.
+    start_order: ?struct { value: ?usize } = null,
 
     /// Convert to an SDL properties group.
     pub fn toProperties(
@@ -1743,19 +1801,59 @@ pub const PlayOptions = struct {
         const ret = try properties.Group.init();
         if (self.loops) |val| try ret.set(
             c.MIX_PROP_PLAY_LOOPS_NUMBER,
-            .{ .number = val },
+            .{ .number = val.toSdl() },
         );
-        if (self.fade_in_milliseconds) |val| try ret.set(
-            c.MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER,
-            .{ .number = val },
-        );
-        if (self.start_millisecond) |val| try ret.set(
-            c.MIX_PROP_PLAY_START_MILLISECOND_NUMBER,
-            .{ .number = val },
+        if (self.max_frame) |val| try ret.set(
+            c.MIX_PROP_PLAY_MAX_FRAME_NUMBER,
+            .{ .number = if (val.value) |v| @intCast(v) else -1 },
         );
         if (self.max_milliseconds) |val| try ret.set(
             c.MIX_PROP_PLAY_MAX_MILLISECONDS_NUMBER,
-            .{ .number = val },
+            .{ .number = if (val.value) |v| @intCast(v) else -1 },
+        );
+        if (self.start_frame) |val| try ret.set(
+            c.MIX_PROP_PLAY_START_FRAME_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.start_millisecond) |val| try ret.set(
+            c.MIX_PROP_PLAY_START_MILLISECOND_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.loop_start_frame) |val| try ret.set(
+            c.MIX_PROP_PLAY_LOOP_START_FRAME_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.loop_start_millisecond) |val| try ret.set(
+            c.MIX_PROP_PLAY_LOOP_START_MILLISECOND_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.fade_in_frames) |val| try ret.set(
+            c.MIX_PROP_PLAY_FADE_IN_FRAMES_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.fade_in_milliseconds) |val| try ret.set(
+            c.MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.fade_in_start_gain) |val| try ret.set(
+            c.MIX_PROP_PLAY_FADE_IN_START_GAIN_FLOAT,
+            .{ .float = val },
+        );
+        if (self.append_silence_frames) |val| try ret.set(
+            c.MIX_PROP_PLAY_APPEND_SILENCE_FRAMES_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.append_silence_milliseconds) |val| try ret.set(
+            c.MIX_PROP_PLAY_APPEND_SILENCE_MILLISECONDS_NUMBER,
+            .{ .number = @intCast(val) },
+        );
+        if (self.halt_when_exhausted) |val| try ret.set(
+            c.MIX_PROP_PLAY_HALT_WHEN_EXHAUSTED_BOOLEAN,
+            .{ .boolean = val },
+        );
+        if (self.start_order) |val| try ret.set(
+            c.MIX_PROP_PLAY_START_ORDER_NUMBER,
+            .{ .number = if (val.value) |v| @intCast(v) else -1 },
         );
         return ret;
     }
