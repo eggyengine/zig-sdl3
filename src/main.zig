@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const events = @import("events.zig");
 const extras = @import("extras.zig");
 const sdl3 = @import("sdl3.zig");
@@ -259,7 +260,7 @@ fn dummyQuit(
 
 // Test main-related functions.
 test "Main" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
     var args = [_:null]?[*:0]u8{
         @constCast("Hello"),
         @constCast("World"),

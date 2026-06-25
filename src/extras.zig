@@ -1,3 +1,4 @@
+const errors = @import("errors.zig");
 const options = @import("options");
 const std = @import("std");
 const timer = @import("timer.zig");
@@ -20,5 +21,5 @@ pub const loggers = @import("extras/loggers.zig");
 pub const FramerateCapper = @import("extras/framerate_capper.zig").FramerateCapper;
 
 test "extra" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

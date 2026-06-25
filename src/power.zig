@@ -58,7 +58,7 @@ pub const PowerState = enum(c.SDL_PowerState) {
 
 // Test power state.
 test "Power" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     _ = try PowerState.get();
 }

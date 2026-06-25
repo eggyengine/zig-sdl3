@@ -721,7 +721,7 @@ pub fn renamePath(
 
 // Filesystem related tests.
 test "Filesystem" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     // Test path helper.
     var path = try Path.init(std.testing.allocator, "/home/gota/test/");

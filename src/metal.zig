@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 const video = @import("video.zig");
 
@@ -63,5 +64,5 @@ pub const View = extern struct {
 
 // Metal glue layer tests.
 test "Metal" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

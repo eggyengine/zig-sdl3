@@ -85,20 +85,6 @@ pub const Version = packed struct {
             z,
         );
     }
-
-    pub fn format(
-        self: Version,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-        return writer.print(
-            "{d}.{d}.{d}",
-            .{ self.getMajor(), self.getMinor(), self.getMicro() },
-        );
-    }
 };
 
 /// This function gets the version of the dynamically linked SDL_ttf library.
@@ -1846,7 +1832,7 @@ pub const Font = struct {
             &w,
             &h,
         ));
-        return .{ .w = w, .h = h };
+        return .{ w, h };
     }
 
     /// Calculate how much of a UTF-8 string will fit in a given width.
@@ -3591,12 +3577,12 @@ pub const Text = struct {
         allocator: std.mem.Allocator,
     ) ![]SubString {
         var count: c_int = undefined;
-        const c_substrings_ptr = try errors.wrapCallNull(**c.TTF_SubString, c.TTF_GetTextSubStringsForRange(
+        const c_substrings_ptr = try errors.wrapCallNull([*]*c.TTF_SubString, @ptrCast(c.TTF_GetTextSubStringsForRange(
             self.value,
             offset,
             length,
             &count,
-        ));
+        )));
         const c_substrings = c_substrings_ptr[0..@intCast(
             count,
         )];
@@ -3607,7 +3593,7 @@ pub const Text = struct {
                 );
             }
             c.SDL_free(
-                c_substrings_ptr,
+                @ptrCast(c_substrings_ptr),
             );
         }
 
@@ -3760,7 +3746,7 @@ pub const SubString = struct {
     /// The internal cluster index, used for quickly iterating
     cluster_index: c_int,
     /// The rectangle, relative to the top left of the text, containing the substring
-    rect: rect.Rect,
+    rect: rect.IRect,
 
     pub fn fromSdl(
         sdl_substring: c.TTF_SubString,
@@ -3783,7 +3769,7 @@ pub const SubString = struct {
             ),
             .line_index = sdl_substring.line_index,
             .cluster_index = sdl_substring.cluster_index,
-            .rect = .{ .value = sdl_substring.rect },
+            .rect = rect.IRect.fromSdl(sdl_substring.rect),
         };
     }
 
@@ -3804,12 +3790,12 @@ pub const SubString = struct {
             .length = length,
             .line_index = self.line_index,
             .cluster_index = self.cluster_index,
-            .rect = self.rect.value,
+            .rect = self.rect.toSdl(),
         };
     }
 };
 
 // TTF testing.
 test "ttf" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

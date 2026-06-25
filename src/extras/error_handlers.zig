@@ -1,3 +1,4 @@
+const errors = @import("../errors.zig");
 const log = @import("../log.zig");
 const message_box = @import("../message_box.zig");
 const options = @import("options");
@@ -69,4 +70,8 @@ pub fn zigLog(
     } else {
         logger.err("[Error:Unknown]", .{});
     }
+}
+
+test "extra error handlers" {
+    errors.refAllDeclsRecursive(@This());
 }

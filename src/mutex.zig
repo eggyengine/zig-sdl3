@@ -733,5 +733,5 @@ pub const Semaphore = struct {
 
 // Mutex testing.
 test "Mutex" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

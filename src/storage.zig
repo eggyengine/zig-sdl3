@@ -721,7 +721,7 @@ pub const Storage = extern struct {
 
 // Storage testing.
 test "Storage" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     // Test path helper.
     var path = try Path.init(std.testing.allocator, "/home/gota/test/");

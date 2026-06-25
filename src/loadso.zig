@@ -100,7 +100,7 @@ pub const SharedObject = extern struct {
 
 // Shared object functionality.
 test "SharedObject" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const obj: ?SharedObject = SharedObject.load("Gota") catch null;
     if (obj) |val| {

@@ -291,5 +291,5 @@ pub fn setText(
 
 // Test the clipboard. Yes it needs video.
 test "Clipboard" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

@@ -2375,5 +2375,5 @@ pub fn premultiplyAlpha(
 
 // Surface tests.
 test "Surface" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

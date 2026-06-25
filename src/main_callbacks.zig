@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const events = @import("events.zig");
 const extras = @import("extras.zig");
 const root = @import("root");
@@ -338,5 +339,5 @@ pub export fn SDL_AppQuit(
 }
 
 test {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

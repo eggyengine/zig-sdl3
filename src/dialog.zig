@@ -395,5 +395,5 @@ pub fn showWithProperties(
 
 // Dialog tests.
 test "Dialog" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

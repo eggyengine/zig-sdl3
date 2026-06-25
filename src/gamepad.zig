@@ -1820,5 +1820,5 @@ pub fn update() void {
 
 // Gamepad tests.
 test "Gamepad" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

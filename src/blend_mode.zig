@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// The normalized factor used to multiply pixel components.
@@ -173,7 +174,7 @@ pub const Mode = enum(c.SDL_BlendMode) {
 
 // Test blend mode creation.
 test "Blend Mode" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     try std.testing.expect(Mode.custom(
         .source_color,

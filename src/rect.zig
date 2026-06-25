@@ -622,7 +622,7 @@ pub const FRect = Rect(FloatingType);
 pub const IRect = Rect(IntegerType);
 
 test "Rect" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const a = IRect{ .x = 10, .y = 20, .w = 50, .h = 50 }; // X: 10, 60; Y: 20, 70.
     const b = IRect{ .x = 30, .y = 30, .w = 10, .h = 10 }; // X: 30, 40; Y: 30, 40.

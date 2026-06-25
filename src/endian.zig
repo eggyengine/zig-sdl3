@@ -263,7 +263,7 @@ pub inline fn swapFloatLe(val: f32) f32 {
 
 // Endian tests.
 test "Endian" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     try std.testing.expectEqual(0x1234, swap16(0x3412));
     try std.testing.expectEqual(0x12345678, swap32(0x78563412));

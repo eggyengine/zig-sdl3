@@ -1,4 +1,5 @@
 const builtin = @import("builtin");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 const Init = @This();
@@ -91,4 +92,8 @@ pub fn init(
         .args = args,
     };
     return &allocated.init;
+}
+
+test "Init" {
+    errors.refAllDeclsRecursive(@This());
 }

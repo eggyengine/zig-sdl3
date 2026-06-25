@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const scancode = @import("scancode.zig");
 const std = @import("std");
 
@@ -476,7 +477,7 @@ pub const KeyModifier = struct {
 
 // Keycode testing.
 test "Keycode" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     const code = Keycode.fromScancode(.a).?;
     try std.testing.expect(code.isScancode());

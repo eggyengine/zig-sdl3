@@ -2,6 +2,7 @@ const std = @import("std");
 const zig = @import("builtin");
 
 pub const image = @import("build/image.zig");
+pub const mixer = @import("build/mixer.zig");
 pub const net = @import("build/net.zig");
 pub const shadercross = @import("build/shadercross.zig");
 pub const shaders = @import("build/shaders.zig");
@@ -20,6 +21,7 @@ const examples = [_][]const u8{
     "hello-world",
     "log",
     "message-box",
+    "mixer",
     "misc",
     "net",
     "properties",
@@ -43,6 +45,8 @@ pub const SdlConfig = struct {
     sdl3_main: bool = false,
     /// Enable the image extension.
     ext_image: ?image.Options = null,
+    /// Enable the mixer extension.
+    ext_mixer: ?mixer.Options = null,
     /// Enable the networking extension.
     ext_net: ?net.Options = null,
     /// Enable the shadercross extension.
@@ -93,9 +97,11 @@ pub fn prepareSdl(
         \\{s}
         \\{s}
         \\{s}
+        \\{s}
     , .{
         if (!cfg.sdl3_main) "#define SDL_MAIN_NOIMPL\n" else "",
         if (cfg.ext_image != null) "#include <SDL3_image/SDL_image.h>\n" else "",
+        if (cfg.ext_mixer != null) "#include <SDL3_mixer/SDL_mixer.h>\n" else "",
         if (cfg.ext_net != null) "#include <SDL3_net/SDL_net.h>\n" else "",
         if (cfg.ext_shadercross != null) "#include <SDL3_shadercross/SDL_shadercross.h>\n" else "",
         if (cfg.ext_ttf != null) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
@@ -185,6 +191,8 @@ pub fn prepareSdl(
 
     if (cfg.ext_image) |opts|
         image.setup(b, extension_config, opts, target, optimize);
+    if (cfg.ext_mixer) |opts|
+        mixer.setup(b, extension_config, opts, target, optimize);
     if (cfg.ext_net) |opts|
         net.setup(b, extension_config, opts, target, optimize);
     if (cfg.ext_shadercross) |opts|
@@ -223,6 +231,7 @@ pub fn build(
 
     // SDL extension options.
     const ext_image = b.option(bool, "ext_image", "Enable SDL_image extension") orelse false;
+    const ext_mixer = b.option(bool, "ext_mixer", "Enable SDL_mixer extension") orelse false;
     const ext_net = b.option(bool, "ext_net", "Enable SDL_net extension") orelse false;
     const ext_shadercross = b.option(bool, "ext_shadercross", "Enable SDL_shadercross extension") orelse false;
     const ext_shadercross_dxc = b.option(bool, "ext_shadercross_dxc", "Enable SDL_shadercross extension DXC support") orelse false;
@@ -246,10 +255,16 @@ pub fn build(
         ext_image_opts.enable_xv = b.option(bool, "image_enable_xv", "Support loading XV images") orelse true;
     }
 
+    // SDL mixer options.
+    var ext_mixer_opts = mixer.Options{};
+    if (ext_mixer) {
+        ext_mixer_opts.shared = b.option(bool, "mixer_shared", "Build SDL_mixer as a shared library") orelse false;
+    }
+
     // SDL net options.
     var ext_net_opts = net.Options{};
     if (ext_net) {
-        ext_net_opts.shared = b.option(bool, "shared", "Build SDL_net as a shared library") orelse false;
+        ext_net_opts.shared = b.option(bool, "net_shared", "Build SDL_net as a shared library") orelse false;
     }
 
     // SDL shadercross options.
@@ -258,7 +273,7 @@ pub fn build(
     // SDL TTF options.
     var ext_ttf_opts = ttf.Options{};
     if (ext_ttf) {
-        ext_ttf_opts.enable_harfbuzz = b.option(bool, "enable-harfbuzz", "Use HarfBuzz to improve text shaping") orelse true;
+        ext_ttf_opts.enable_harfbuzz = b.option(bool, "ttf_enable_harfbuzz", "Use HarfBuzz to improve text shaping") orelse true;
     }
 
     var sdl_config = SdlConfig{
@@ -269,6 +284,7 @@ pub fn build(
         .c_sdl_sanitize_c = c_sdl_sanitize_c,
         .c_sdl_strip = c_sdl_strip,
         .ext_image = if (ext_image) ext_image_opts else null,
+        .ext_mixer = if (ext_mixer) ext_mixer_opts else null,
         .ext_net = if (ext_net) ext_net_opts else null,
         .ext_shadercross = if (ext_shadercross) ext_shadercross_opts else null,
         .ext_shadercross_dxc = ext_shadercross_dxc,
@@ -281,6 +297,7 @@ pub fn build(
     };
     _ = prepareSdl(b, sdl_config, target, optimize, true);
     sdl_config.ext_image = ext_image_opts;
+    sdl_config.ext_mixer = ext_mixer_opts;
     sdl_config.ext_net = ext_net_opts;
     sdl_config.ext_shadercross = ext_shadercross_opts;
     sdl_config.ext_ttf = ext_ttf_opts;

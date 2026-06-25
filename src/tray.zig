@@ -641,5 +641,5 @@ pub fn update() void {
 
 // Tray tests.
 test "Tray" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

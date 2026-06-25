@@ -1,4 +1,5 @@
 const c = @import("c");
+const errors = @import("errors.zig");
 const std = @import("std");
 
 /// Constant only true if compiling for AIX.
@@ -240,7 +241,7 @@ pub fn get() [:0]const u8 {
 
 // Test platform.
 test "Platform" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 
     _ = aix;
     _ = android;

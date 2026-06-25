@@ -813,6 +813,8 @@ fn testHintCb(user_data: ?*i32, name: [:0]const u8, old_value: ?[:0]const u8, ne
 
 // Test hint functions.
 test "Hints" {
+    errors.refAllDeclsRecursive(@This());
+
     var ctr: i32 = 0;
     const cb = try addCallback(.app_name, i32, testHintCb, &ctr);
     try std.testing.expectEqual(1, ctr);

@@ -29,7 +29,7 @@ The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
 ```sh
-zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.2.1
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.2.2
 ```
 * For in progress updates (nightly):
 ```sh
@@ -45,6 +45,7 @@ const sdl3 = b.dependency("sdl3", .{
 
     // Lib options.
     /// .ext_image = false,
+    /// .ext_mixer = false,
     /// .ext_net = false,
     /// .ext_shadercross = false,
     /// .ext_shadercross_dxc = false,
@@ -75,6 +76,12 @@ const sdl3 = b.dependency("sdl3", .{
     // .image_enable_xcf = true,
     // .image_enable_xpm = true,
     // .image_enable_xv = true,
+    // 
+    // Options if `ext_mixer` is enabled:
+    // .mixer_shared = false,
+    // 
+    // Options if `ext_net` is enabled:
+    // .net_shared = false,
 });
 ```
 Now add the modules and artifact to your target as you would normally:

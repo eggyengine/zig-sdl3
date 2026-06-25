@@ -360,5 +360,5 @@ pub const Process = extern struct {
 
 // Process creation and such.
 test "Process" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }

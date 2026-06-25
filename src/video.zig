@@ -3831,5 +3831,5 @@ pub fn getWindows() ![]Window {
 
 // Tests for the video subsystem.
 test "Video" {
-    std.testing.refAllDecls(@This());
+    errors.refAllDeclsRecursive(@This());
 }
