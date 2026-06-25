@@ -152,6 +152,99 @@ pub fn TrackStoppedCallback(comptime UserData: type) type {
 pub const Audio = extern struct {
     value: *c.MIX_Audio,
 
+    /// Audio initialization properties.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const InitProperties = struct {
+        /// Used to load audio data.
+        /// This stream must be able to seek!
+        stream: io_stream.Stream,
+        /// True if SDL mixer should close the `stream` before returning (success or failure).
+        close_io: bool,
+        /// True if SDL mixer should fully decode and decompress the data before returning.
+        /// Otherwise it will be stored in its original state and decompressed on demand.
+        pre_decode: bool,
+        /// In case steps can be made to match its format when decoding.
+        preferred_mixer: ?Mixer = null,
+        /// True to skip parsing metadata tags, like ID3 and APE tags.
+        /// This can be used to speed up loading if the data definitely doesn't have these tags.
+        /// Some decoders will fail if these tags are present when this property is `true`.
+        skip_metadata_tags: ?bool = null,
+        /// True to ignore metadata in the audio data specifying loop points.
+        /// This will make a file decode from start to finish without looping, even if the file specified it should have.
+        /// This audio can still be looped at playback time via `Track` loop settings, regardless of this setting.
+        /// Default false.
+        ignore_loops: ?bool = null,
+        /// he name of the decoder to use for this data.
+        /// If not specified, SDL mixer will examine the data and choose the best decoder.
+        /// These names are the same returned from `getAudioDecoder`.
+        audio_decoder: ?[:0]const u8 = null,
+
+        /// Convert to SDL.
+        pub fn toSdl(
+            self: InitProperties,
+        ) !properties.Group {
+            const props = try properties.Group.init();
+            errdefer props.deinit();
+
+            try props.set(c.MIX_PROP_AUDIO_LOAD_IOSTREAM_POINTER, .{ .pointer = self.stream.value });
+            try props.set(c.MIX_PROP_AUDIO_LOAD_CLOSEIO_BOOLEAN, .{ .boolean = self.close_io });
+            try props.set(c.MIX_PROP_AUDIO_LOAD_PREDECODE_BOOLEAN, .{ .boolean = self.pre_decode });
+            if (self.preferred_mixer) |preferred_mixer|
+                try props.set(c.MIX_PROP_AUDIO_LOAD_PREFERRED_MIXER_POINTER, .{ .pointer = preferred_mixer.value });
+            if (self.skip_metadata_tags) |skip_metadata_tags|
+                try props.set(c.MIX_PROP_AUDIO_LOAD_SKIP_METADATA_TAGS_BOOLEAN, .{ .boolean = skip_metadata_tags });
+            if (self.ignore_loops) |ignore_loops|
+                try props.set(c.MIX_PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN, .{ .boolean = ignore_loops });
+            if (self.audio_decoder) |audio_decoder|
+                try props.set(c.MIX_PROP_AUDIO_DECODER_STRING, .{ .string = audio_decoder });
+            return props;
+        }
+    };
+
+    /// Audio properties.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const Properties = struct {
+        /// The audio's title ("Smells Like Teen Spirit").
+        title: ?[:0]const u8,
+        /// The audio's artist name ("Nirvana").
+        artist: ?[:0]const u8,
+        /// The audio's album name ("Nevermind").
+        album: ?[:0]const u8,
+        /// The audio's copyright info ("Copyright (c) 1991").
+        copyright: ?[:0]const u8,
+        /// The audio's track number on the album (1).
+        track: ?i64,
+        /// The total tracks on the album (13).
+        total_tracks: ?usize,
+        /// he year the audio was released (1991).
+        year: ?usize,
+        /// The sample frames worth of PCM data that comprise this audio.
+        /// It might be off by a little if the decoder only knows the duration as a unit of time.
+        duration_frames: ?usize,
+        /// If `true`, audio never runs out of sound to generate.
+        /// This isn't necessarily always known to SDL mixer, though.
+        duration_infinite: ?bool,
+
+        /// Get properties from SDL.
+        pub fn fromSdl(props: properties.Group) Properties {
+            return .{
+                .title = if (props.get(c.MIX_PROP_METADATA_TITLE_STRING)) |val| val.string else null,
+                .album = if (props.get(c.MIX_PROP_METADATA_ARTIST_STRING)) |val| val.string else null,
+                .artist = if (props.get(c.MIX_PROP_METADATA_ALBUM_STRING)) |val| val.string else null,
+                .copyright = if (props.get(c.MIX_PROP_METADATA_COPYRIGHT_STRING)) |val| val.string else null,
+                .track = if (props.get(c.MIX_PROP_METADATA_TRACK_NUMBER)) |val| val.number else null,
+                .total_tracks = if (props.get(c.MIX_PROP_METADATA_TOTAL_TRACKS_NUMBER)) |val| @intCast(val.number) else null,
+                .year = if (props.get(c.MIX_PROP_METADATA_YEAR_NUMBER)) |val| @intCast(val.number) else null,
+                .duration_frames = if (props.get(c.MIX_PROP_METADATA_DURATION_FRAMES_NUMBER)) |val| @intCast(val.number) else null,
+                .duration_infinite = if (props.get(c.MIX_PROP_METADATA_DURATION_INFINITE_BOOLEAN)) |val| val.boolean else null,
+            };
+        }
+    };
+
     /// Destroy the specified audio.
     ///
     /// ## Function Parameters
@@ -269,6 +362,30 @@ pub const Audio = extern struct {
         );
         try errors.wrapCallBool(ret);
         return audio.Spec.fromSdl(spec);
+    }
+
+    /// Get the properties associated with an audio.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio to query.
+    ///
+    /// ## Return Value
+    /// Returns the audio properties.
+    ///
+    /// ## Remarks
+    /// Note that the metadata properties are whatever SDL mixer finds in things like ID3 tags, and they often have very little standardized formatting, may be missing,
+    /// and can be completely wrong if the original data is untrustworthy (like an MP3 from a P2P file sharing service).
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL mixer 3.0.0.
+    pub fn getProperties(
+        self: Audio,
+    ) !Properties {
+        const props = try errors.wrapCall(c.SDL_PropertiesID, c.MIX_GetAudioProperties(self.value), 0);
+        return Properties.fromSdl(.{ .value = props });
     }
 
     /// Load audio for playback from a file.
@@ -585,6 +702,31 @@ pub const Audio = extern struct {
         return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, ret) };
     }
 
+    /// Load audio for playback through a collection of properties.
+    ///
+    /// ## Function Parameters
+    /// * `init_properties`: A set of properties on how to load audio.
+    ///
+    /// ## Return Value
+    /// Returns an audio object that can be used to make sound on a mixer.
+    ///
+    /// ## Remarks
+    /// Specific decoders might accept additional custom properties, such as where to find soundfonts for MIDI playback, etc.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn initWithProperties(
+        init_properties: InitProperties,
+    ) !Audio {
+        const props = try init_properties.toSdl();
+        defer props.deinit();
+
+        return Audio{ .value = try errors.wrapCallNull(*c.MIX_Audio, c.MIX_LoadAudioWithProperties(props.value)) };
+    }
+
     /// Convert milliseconds to sample frames for an Audio's format.
     ///
     /// ## Function Parameters
@@ -694,6 +836,32 @@ pub const AudioDecoder = extern struct {
         var ret: c.SDL_AudioSpec = undefined;
         try errors.wrapCallBool(c.MIX_GetAudioDecoderFormat(self.value, &ret));
         return audio.Spec.fromSdl(ret);
+    }
+
+    /// Get the properties associated with an audio decoder.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The audio decoder to query.
+    ///
+    /// ## Return Value
+    /// Returns the properties.
+    ///
+    /// ## Remarks
+    /// SDL mixer offers some properties of its own, but this can also be a convenient place to store app-specific data.
+    ///
+    /// A properties is created the first time this function is called for a given audio decoder, if necessary.
+    ///
+    /// The file-specific metadata exposed through this function is identical to those available through `Mixer.getAudioProperties`.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getProperties(
+        self: AudioDecoder,
+    ) !properties.Group {
+        return .{ .value = try errors.wrapCall(c.SDL_PropertiesID, c.MIX_GetAudioDecoderProperties(self.value), 0) };
     }
 
     /// Create an audio decoder from a path on the filesystem.
@@ -838,6 +1006,30 @@ pub const Group = struct {
         return .{ .value = try errors.wrapCallNull(*c.MIX_Mixer, c.MIX_GetGroupMixer(self.value)) };
     }
 
+    /// Get the properties associated with a group.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The group to query.
+    ///
+    /// ## Return Value
+    /// Returns the group properties.
+    ///
+    /// ## Remarks
+    /// Currently SDL mixer assigns no properties of its own to a group, but this can be a convenient place to store app-specific data.
+    ///
+    /// The properties are created the first time this function is called for a given group.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getProperties(
+        self: Group,
+    ) !properties.Group {
+        return .{ .value = try errors.wrapCall(c.SDL_PropertiesID, c.MIX_GetGroupProperties(self.value), 0) };
+    }
+
     /// Create a mixing group.
     ///
     /// ## Function Parameters
@@ -957,6 +1149,23 @@ pub const LoopCount = union(enum) {
 /// This datatype is available since SDL_mixer 3.0.0.
 pub const Mixer = struct {
     value: *c.MIX_Mixer,
+
+    /// Mixer properties.
+    ///
+    /// ## Version
+    /// This struct is provided by zig-sdl3.
+    pub const Properties = struct {
+        /// The audio device that this mixer has opened for playback.
+        /// This will be `null` (no device) if the mixer was created with `Mixer.init` instead of `Mixer.initDevice`.
+        device: ?audio.Device,
+
+        /// Get properties from SDL.
+        pub fn fromSdl(props: properties.Group) Properties {
+            return .{
+                .device = if (props.get(c.MIX_PROP_MIXER_DEVICE_NUMBER)) |val| if (val.number == 0) null else .{ .value = @intCast(val.number) } else null,
+            };
+        }
+    };
 
     /// Free a mixer.
     ///
@@ -1112,6 +1321,26 @@ pub const Mixer = struct {
         return c.MIX_GetMixerGain(
             self.value,
         );
+    }
+
+    /// Get the properties associated with a mixer.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The mixer to query.
+    ///
+    /// ## Return Value
+    /// Returns the mixer's properties.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getProperties(
+        self: Mixer,
+    ) !Properties {
+        const props = try errors.wrapCall(c.SDL_PropertiesID, c.MIX_GetMixerProperties(self.value), 0);
+        return Properties.fromSdl(.{ .value = props });
     }
 
     /// Get all tracks with a specific tag.
@@ -2194,6 +2423,30 @@ pub const Track = struct {
         self: Track,
     ) !usize {
         return @intCast(try errors.wrapCall(c.Sint64, c.MIX_GetTrackPlaybackPosition(self.value), -1));
+    }
+
+    /// Get the properties associated with a track.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The track to query.
+    ///
+    /// ## Return Value
+    /// Returns the track properties.
+    ///
+    /// ## Remarks
+    /// Currently SDL mixer assigns no properties of its own to a track, but this can be a convenient place to store app-specific data.
+    ///
+    /// A properties group is created the first time this function is called for a given track.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_mixer 3.0.0.
+    pub fn getProperties(
+        self: Track,
+    ) !properties.Group {
+        return .{ .value = try errors.wrapCall(c.SDL_PropertiesID, c.MIX_GetTrackProperties(self.value), 0) };
     }
 
     /// Return the number of sample frames remaining to be mixed in a track.
