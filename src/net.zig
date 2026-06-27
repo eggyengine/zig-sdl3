@@ -23,6 +23,98 @@ comptime {
 pub const Address = extern struct {
     value: *c.NET_Address,
 
+    comptime {
+        std.debug.assert(@sizeOf(Address) == @sizeOf(*c.NET_Address));
+    }
+
+    /// Compare two `Address` objects.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The first address to compare.
+    /// * `other`: second address to compare.
+    ///
+    /// ## Return Value
+    /// Returns `std.math.Order.lt` if `self` is "less than" `other`, `std.math.Order.gt` if "greater than", `std.math.Order.eq` if equal.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_net 3.0.0.
+    pub fn compare(
+        self: Address,
+        other: Address,
+    ) std.math.Order {
+        return std.math.order(c.NET_CompareAddresses(self.value, other.value), 0);
+    }
+
+    /// Drop a reference to an `net.Address`.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The address to deinitialize.
+    ///
+    /// ## Remarks
+    /// Since several pieces of the library might share a single `net.Address`, including a background thread that's working on resolving, these objects are referenced counted.
+    /// This allows everything that's using it to declare they still want it, and drop their reference to the address when they are done with it.
+    /// The object's resources are freed when the last reference is dropped.
+    /// This function drops a reference to an `net.Address`, decreasing its reference count by one.
+    /// The documentation will tell you when the app has to explicitly unref an address.
+    /// For example, `net.Address.init()` creates addresses that are already referenced, so the caller needs to call `deinit()` when done.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_net 3.0.0.
+    pub fn deinit(
+        self: Address,
+    ) void {
+        c.NET_UnrefAddress(self.value);
+    }
+
+    /// Check if an address is resolved, without blocking.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The address to query.
+    ///
+    /// ## Return Value
+    /// Returns `net.Address.Status.resolved` if successfully resolved, `net.Address.Status.resolving` if still resolving.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_net 3.0.0.
+    pub fn getStatus(
+        self: Address,
+    ) Error!Status {
+        return Status.fromSdl(c.NET_GetAddressStatus(self.value));
+    }
+
+    /// Get a human-readable string from a resolved address.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The address to query.
+    ///
+    /// ## Return Value
+    /// Returns a string, or `null` on error or if not yet resolved.
+    ///
+    /// ## Remarks
+    /// The returned string is owned by the `net.Address` and is valid as long as the object lives.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_net 3.0.0.
+    pub fn getString(
+        self: Address,
+    ) ?[:0]const u8 {
+        const ret = c.NET_GetAddressString(self.value);
+        if (ret == null) return null;
+        return std.mem.sliceTo(ret, 0);
+    }
+
     /// Resolve a human-readable hostname.
     ///
     /// ## Function Parameters
@@ -54,30 +146,6 @@ pub const Address = extern struct {
         return .{
             .value = try errors.wrapCallNull(*c.NET_Address, c.NET_ResolveHostname(host.ptr)),
         };
-    }
-
-    /// Drop a reference to an `net.Address`.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The address to deinitialize.
-    ///
-    /// ## Remarks
-    /// Since several pieces of the library might share a single `net.Address`, including a background thread that's working on resolving, these objects are referenced counted.
-    /// This allows everything that's using it to declare they still want it, and drop their reference to the address when they are done with it.
-    /// The object's resources are freed when the last reference is dropped.
-    /// This function drops a reference to an `net.Address`, decreasing its reference count by one.
-    /// The documentation will tell you when the app has to explicitly unref an address.
-    /// For example, `net.Address.init()` creates addresses that are already referenced, so the caller needs to call `deinit()` when done.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_net 3.0.0.
-    pub fn deinit(
-        self: Address,
-    ) void {
-        c.NET_UnrefAddress(self.value);
     }
 
     /// Add a reference to an `net.Address`.
@@ -129,73 +197,68 @@ pub const Address = extern struct {
         }
         return ret == 1;
     }
+};
 
-    /// Check if an address is resolved, without blocking.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The address to query.
-    ///
-    /// ## Return Value
-    /// Returns `net.Address.Status.resolved` if successfully resolved, `net.Address.Status.resolving` if still resolving.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_net 3.0.0.
-    pub fn getStatus(
-        self: Address,
-    ) Error!Status {
-        return Status.fromSdl(c.NET_GetAddressStatus(self.value));
-    }
-
-    /// Get a human-readable string from a resolved address.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The address to query.
-    ///
-    /// ## Return Value
-    /// Returns a string, or `null` on error or if not yet resolved.
-    ///
-    /// ## Remarks
-    /// The returned string is owned by the `net.Address` and is valid as long as the object lives.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_net 3.0.0.
-    pub fn getString(
-        self: Address,
-    ) ?[:0]const u8 {
-        const ret = c.NET_GetAddressString(self.value);
-        if (ret == null) return null;
-        return std.mem.sliceTo(ret, 0);
-    }
-
-    /// Compare two `net.Address` objects.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The first address to compare.
-    /// * `other`: second address to compare.
-    ///
-    /// ## Return Value
-    /// Returns `std.math.Order.lt` if `self` is "less than" `other`, `std.math.Order.gt` if "greater than", `std.math.Order.eq` if equal.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_net 3.0.0.
-    pub fn compare(
-        self: Address,
-        other: Address,
-    ) std.math.Order {
-        return std.math.order(c.NET_CompareAddresses(self.value, other.value), 0);
-    }
+/// The data provided for new incoming packets from `DatagramSocket.receive`.
+///
+/// ## Version
+/// This datatype is available since SDL_net 3.0.0.
+pub const Datagram = extern struct {
+    /// Sender's address. This is unref'd by `Datagram.deinit`.
+    /// You only need to ref it if you want to keep it.
+    addr: Address,
+    /// Sender's port.
+    /// These do not have to come from the same port the receiver is bound to.
+    /// These are in host byte order, don't byteswap them!
+    port: u16,
+    /// The payload of this datagram.
+    buf: [*]u8,
+    /// The number of bytes available at `buf`.
+    buf_len: c_int,
 
     comptime {
-        std.debug.assert(@sizeOf(Address) == @sizeOf(*c.NET_Address));
+        errors.assertStructsEqual(@This(), c.NET_Datagram);
+    }
+
+    /// Dispose of a datagram packet previously received.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The datagram to destroy.
+    ///
+    /// ## Remarks
+    /// You must pass packets received through `ReceiveDatagram` to this function when you are done with them.
+    /// This will free resources used by this packet and unref its `Address`.
+    ///
+    /// If you want to save the sender's address from the packet past this time, it is safe to call `Address.ref` on the address and hold onto its pointer,
+    /// so long as you call `Address.unref` on it when you are done with it.
+    ///
+    /// Once you call this function, the datagram pointer becomes invalid and should not be used again by the app.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    ///
+    /// ## Version
+    /// This function is available since SDL_net 3.0.0.
+    pub fn deinit(
+        self: *Datagram,
+    ) void {
+        c.NET_DestroyDatagram(@ptrCast(@alignCast(self)));
+    }
+
+    /// Get the data payload of the datagram.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The datagram to get the data from.
+    ///
+    /// ## Remarks
+    /// The returned slice is owned by the datagram and is valid until `deinit()` is called.
+    ///
+    /// ## Version
+    /// This function is provided by zig-sdl3.
+    pub fn getData(
+        self: Datagram,
+    ) []const u8 {
+        return self.buf[0..@intCast(self.buf_len)];
     }
 };
 
@@ -354,6 +417,33 @@ pub const DatagramSocket = struct {
     }
 };
 
+/// A list of local addresses returned by `getLocalAddresses`.
+///
+/// ## Version
+/// This struct is provided by zig-sdl3.
+pub const LocalAddressList = struct {
+    addresses: []Address,
+
+    /// Free the list of local addresses.
+    ///
+    /// ## Function Parameters
+    /// * `self`: The list to deinitialize.
+    ///
+    /// ## Remarks
+    /// This will unref all addresses in the array and free the array itself.
+    ///
+    /// Since addresses are reference counted, it is safe to keep any addresses you want from this array even after calling this function,
+    /// as long as you called `Address.ref` on them first.
+    ///
+    /// ## Thread Safety
+    /// It is safe to call this function from any thread.
+    pub fn deinit(
+        self: LocalAddressList,
+    ) void {
+        c.NET_FreeLocalAddresses(@ptrCast(@alignCast(self.addresses.ptr)));
+    }
+};
+
 /// The receiving end of a stream connection.
 ///
 /// ## Remarks
@@ -416,29 +506,39 @@ pub const Server = struct {
     /// Create a stream socket for the next pending client connection.
     ///
     /// ## Function Parameters
-    /// * `self`: The server to check for pending connections.
+    /// * `self`: The server object to check for pending connections.
     ///
     /// ## Return Value
     /// Returns a new stream socket if a connection was pending, `null` otherwise.
     ///
+    /// ## Remarks
+    /// When a client connects to a server, their connection will be pending until the server accepts the connection.
+    /// Once accepted, the server will be given a stream socket to communicate with the client, and they can send data to, and receive data from, each other.
+    ///
+    /// Unlike `StreamSocket.initClient`, stream sockets returned from this function are already connected and do not have to wait for the connection to complete,
+    /// as server acceptance is the final step of connecting.
+    ///
+    /// This function does not block.
+    /// In fact, this function should be called in a loop until the result is `null`, so all pending connections are accepted in a single batch.
+    ///
+    /// If you want the server to sleep until there's a new connection, you can use `waitUntilInputAvailable`.
+    ///
+    /// When done with the newly-accepted client, you can disconnect and dispose of the stream socket by calling `StreamSocket.deinit`.
+    ///
     /// ## Thread Safety
     /// You should not operate on the same server from multiple threads at the same time without supplying a serialization mechanism.
+    /// However, different threads may access different servers at the same time without problems.
     ///
     /// ## Version
     /// This function is available since SDL_net 3.0.0.
     pub fn accept(
         self: Server,
-    ) Error!?StreamSocket {
-        var client_stream: ?*c.NET_StreamSocket = null;
-        if (!c.NET_AcceptClient(self.value, &client_stream)) {
-            errors.callErrorCallback();
-            return error.SdlNetError;
-        }
-        if (client_stream) |ptr| {
-            return StreamSocket{ .value = ptr };
-        } else {
-            return null;
-        }
+    ) !?StreamSocket {
+        var ret: ?*c.NET_StreamSocket = undefined;
+        try errors.wrapCallBool(c.NET_AcceptClient(self.value, &ret));
+        if (ret) |val|
+            return .{ .value = val };
+        return null;
     }
 };
 
@@ -913,130 +1013,6 @@ pub const Timeout = union(enum) {
     }
 };
 
-/// Enable simulated address resolution failures.
-///
-/// ## Function Parameters
-/// * `percent_loss`: A number between 0 and 100. Higher means more failures. Zero to disable.
-///
-/// ## Thread Safety
-/// It is safe to call this function from any thread.
-///
-/// ## Version
-/// This function is available since SDL_net 3.0.0.
-pub fn simulateAddressResolutionLoss(
-    percent_loss: u8,
-) void {
-    std.debug.assert(percent_loss <= 100);
-    c.NET_SimulateAddressResolutionLoss(@intCast(percent_loss));
-}
-
-/// A list of local addresses returned by `getLocalAddresses`.
-///
-/// ## Version
-/// This struct is provided by zig-sdl3.
-pub const LocalAddressList = struct {
-    slice: []Address,
-
-    /// Free the list of local addresses.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The list to deinitialize.
-    ///
-    /// ## Remarks
-    /// This will unref all addresses in the list and free the list itself.
-    /// It is safe to keep any addresses you want from this list even after calling this function, as long as you called `ref()` on them first.
-    pub fn deinit(
-        self: LocalAddressList,
-    ) void {
-        c.NET_FreeLocalAddresses(@ptrCast(self.slice.ptr));
-    }
-};
-
-/// Obtain a list of local addresses on the system.
-///
-/// ## Return Value
-/// Returns a list of `net.Address` objects, one for each bindable address on the system.
-/// The caller must call `deinit()` on the returned list when done with it.
-///
-/// ## Thread Safety
-/// It is safe to call this function from any thread.
-///
-/// ## Version
-/// This function is available since SDL_net 3.0.0.
-pub fn getLocalAddresses() Error!LocalAddressList {
-    var num_addresses: c_int = 0;
-    const addresses_c = c.NET_GetLocalAddresses(&num_addresses);
-    if (addresses_c == null) {
-        errors.callErrorCallback();
-        return error.SdlNetError;
-    }
-
-    return .{ .slice = @as([*]Address, @ptrCast(addresses_c))[0..@intCast(num_addresses)] };
-}
-
-/// The data provided for new incoming packets from `DatagramSocket.receive`.
-///
-/// ## Version
-/// This datatype is available since SDL_net 3.0.0.
-pub const Datagram = extern struct {
-    /// Sender's address. This is unref'd by `Datagram.deinit`.
-    /// You only need to ref it if you want to keep it.
-    addr: Address,
-    /// Sender's port.
-    /// These do not have to come from the same port the receiver is bound to.
-    /// These are in host byte order, don't byteswap them!
-    port: u16,
-    /// The payload of this datagram.
-    buf: [*]u8,
-    /// The number of bytes available at `buf`.
-    buf_len: c_int,
-
-    comptime {
-        errors.assertStructsEqual(@This(), c.NET_Datagram);
-    }
-
-    /// Dispose of a datagram packet previously received.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The datagram to destroy.
-    ///
-    /// ## Remarks
-    /// You must pass packets received through `ReceiveDatagram` to this function when you are done with them.
-    /// This will free resources used by this packet and unref its `Address`.
-    ///
-    /// If you want to save the sender's address from the packet past this time, it is safe to call `Address.ref` on the address and hold onto its pointer,
-    /// so long as you call `Address.unref` on it when you are done with it.
-    ///
-    /// Once you call this function, the datagram pointer becomes invalid and should not be used again by the app.
-    ///
-    /// ## Thread Safety
-    /// It is safe to call this function from any thread.
-    ///
-    /// ## Version
-    /// This function is available since SDL_net 3.0.0.
-    pub fn deinit(
-        self: *Datagram,
-    ) void {
-        c.NET_DestroyDatagram(@ptrCast(@alignCast(self)));
-    }
-
-    /// Get the data payload of the datagram.
-    ///
-    /// ## Function Parameters
-    /// * `self`: The datagram to get the data from.
-    ///
-    /// ## Remarks
-    /// The returned slice is owned by the datagram and is valid until `deinit()` is called.
-    ///
-    /// ## Version
-    /// This function is provided by zig-sdl3.
-    pub fn getData(
-        self: Datagram,
-    ) []const u8 {
-        return self.buf[0..@intCast(self.buf_len)];
-    }
-};
-
 /// A socket that can be polled for input.
 ///
 /// ## Version
@@ -1054,6 +1030,36 @@ pub const Pollable = union(enum) {
         };
     }
 };
+
+/// Obtain a list of local addresses on the system.
+///
+/// ## Return Value
+/// Returns a list of `Address` objects, one for each bindable address on the system.
+/// The caller must call `LocalAddressList.deinit` on the returned list when done with it.
+///
+/// ## Remarks
+/// This returns addresses that you can theoretically bind a socket to, to accept connections from other machines at that address.
+///
+/// You almost never need this function; first, it's hard to tell what is a good address to bind to, without asking the user (who will likely find it equally hard to decide).
+/// Second, most machines will have lots of private addresses that are accessible on the same LAN, but not public ones that are accessible from the outside Internet.
+///
+/// Usually it's better to use `Server.init` or `DatagramSocket.init` with a `null` address, to say "bind to all interfaces".
+///
+/// Pass the returned array to `LocalAddressList.deinit` when you are done with it.
+/// It is safe to keep any addresses you want from this array even after calling that function, as long as you called `Address.ref` on them.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// ## Version
+/// This function is available since SDL_net 3.0.0.
+pub fn getLocalAddresses() !LocalAddressList {
+    var num_addresses: c_int = undefined;
+    const addresses: [*]Address = @ptrCast(@alignCast(try errors.wrapCallNull([*]?*c.NET_Address, c.NET_GetLocalAddresses(&num_addresses))));
+    return .{
+        .addresses = addresses[0..@intCast(num_addresses)],
+    };
+}
 
 /// Initialize the SDL net library.
 ///
@@ -1087,6 +1093,23 @@ pub fn init() !void {
 /// This function is available since SDL_net 3.0.0.
 pub fn quit() void {
     c.NET_Quit();
+}
+
+/// Enable simulated address resolution failures.
+///
+/// ## Function Parameters
+/// * `percent_loss`: A number between 0 and 100. Higher means more failures. Zero to disable.
+///
+/// ## Thread Safety
+/// It is safe to call this function from any thread.
+///
+/// ## Version
+/// This function is available since SDL_net 3.0.0.
+pub fn simulateAddressResolutionLoss(
+    percent_loss: u8,
+) void {
+    std.debug.assert(percent_loss <= 100);
+    c.NET_SimulateAddressResolutionLoss(@intCast(percent_loss));
 }
 
 /// Block on multiple sockets until at least one has data available.
