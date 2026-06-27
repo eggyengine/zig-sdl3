@@ -3368,6 +3368,9 @@ pub const Track = struct {
 };
 
 /// SDL mixer version information.
+///
+/// ## Version
+/// This struct is provided by zig-sdl3.
 pub const Version = struct {
     value: c_int,
 

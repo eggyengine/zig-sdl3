@@ -32,8 +32,8 @@
             .lazy = true,
         },
         .sdl_net = .{
-            .url = "git+https://github.com/libsdl-org/SDL_net.git#8f5d9df8e42eb31e68aa3aed74ba2ab380e3001e",
-            .hash = "N-V-__8AAK74BwCyuisw6wdXWDDg8sXuHJd_tPk1VKxLTUBK",
+            .url = "git+https://github.com/libsdl-org/SDL_net?ref=release-3.2.0#1a84a2a6b9663572f77e2eb5348d42845bac0053",
+            .hash = "N-V-__8AAC70ewBFR7hJ-WuPPuKSgZg36lEpcTIx9oIhuJbL",
             .lazy = true,
         },
         .sdl_shadercross = .{
