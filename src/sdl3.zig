@@ -395,7 +395,7 @@ pub const hints = @import("hints.zig");
 /// This is a simple library to load images of various formats as SDL surfaces.
 /// It can load BMP, GIF, JPEG, LBM, PCX, PNG, PNM (PPM/PGM/PBM), QOI, TGA, XCF, XPM, and simple SVG format images.
 /// It can also load AVIF, JPEG-XL, TIFF, and WebP images, depending on build options.
-/// If there are errors using this, you need to ensure `ext_net` is set to `true`.
+/// If there are errors using this, you need to ensure `ext_image` is set to `true`.
 pub const image = @import("image.zig");
 
 /// Initialization data that can be used for callbacks.
@@ -618,6 +618,8 @@ pub const MetalView = @import("metal.zig").View;
 /// Either effect can be useful for different situations.
 /// SDL mixer is not meant to be a full 3D audio engine, but rather Good Enough for many purposes; if something more powerful in terms of 3D audio is needed,
 /// consider a proper 3D library like OpenAL.
+///
+/// If there are errors using this, you need to ensure `ext_mixer` is set to `true`.
 pub const mixer = @import("mixer.zig");
 
 /// Any GUI application has to deal with the mouse, and SDL provides functions to manage mouse input and the displayed cursor.
@@ -655,7 +657,66 @@ pub const mouse = @import("mouse.zig");
 /// that several threads might try to use for the first time simultaneously.
 pub const mutex = @import("mutex.zig");
 
-/// TODO documentation.
+/// SDL net is a simple library to help with networking.
+///
+/// In current times, it's a relatively thin layer over system-level APIs like BSD Sockets or WinSock.
+/// Its primary strength is in making those interfaces less complicated to use, and handling several unexpected corner cases, so the app doesn't have to.
+///
+/// Some design philosophies of SDL net:
+/// * Nothing is blocking (but you can explicitly wait on things if you want).
+/// * Addressing is abstract so you don't have to worry about specific networks and their specific protocols.
+/// * Simple is better than hard, and not necessarily less powerful either.
+///
+/// There are several pieces to this library, and most apps won't use them all, but rather choose the portion that's relevant to their needs.
+///
+/// All apps will call `net.init` on startup and `net.quit` on shutdown.
+///
+/// The cornerstone of the library is the `net.Address` object.
+/// This is what manages the details of how to reach another computer on the network, and what network protocol to use to get there.
+/// You'll need a `net.Address` to talk over the network.
+/// If you need to convert a hostname (such as "google.com" or "libsdl.org") into a `net.Address`, you can call `net.Address.resolveHostname`,
+/// which will do the appropriate DNS queries on a background thread.
+/// Once these are ready, you can use the `Address` to connect to these hosts over the Internet.
+///
+/// Something that initiates a connection to a remote system is called a "client," connecting to a "server".
+/// To establish a connection, use the `net.Address` you resolved with `net.StreamSocket.initClient`.
+/// Once the connection is established (a non-blocking operation), you'll have a `net.StreamSocket` object that can send and receive data over the connection,
+/// using `net.StreamSocket.write` and `net.StreamSocket.read`.
+///
+/// To instead be a server, that clients connect to, call `net.Server.init` to get a `net.Server` object.
+/// All a `net.Server` does is allow you to accept connections from clients, turning them into `net.StreamSocket`s,
+/// where you can read and write from the opposite side of the connection from a given client.
+///
+/// These things are, underneath this API, TCP connections, which means you can use a client or server to talk to something that isn't using SDL net at all.
+///
+/// Clients and servers deal with "stream sockets", a reliable stream of bytes. There are tradeoffs to using these, especially in poor network conditions.
+/// Another option is to use "datagram sockets", which map to UDP packet transmission.
+/// With datagrams, everyone involved can send small packets of data that may arrive in any order, or not at all,
+/// but transmission can carry on if a packet is lost, each packet is clearly separated from every other,
+/// and communication can happen in a peer-to-peer model instead of client-server: while datagrams can be more complex, these are useful properties not avaiable to stream sockets.
+/// `net.DatagramSocket.init` is used to prepare for datagram communication, then `net.DatagramSocket.send` and net.DatagramSocket.receive transmit packets.
+///
+/// As previously mentioned, SDL net's API is "non-blocking" (asynchronous).
+/// Any network operation might take time, but SDL net's APIs will not wait until they complete.
+/// Any operation will return immediately, with options to check if the operation has completed later.
+/// Generally this is what a video game needs, but there are times where it makes sense to pause until an operation completes; in a background thread this might make sense,
+/// as it could simplify the code dramatically.
+///
+/// The functions that block until an operation completes:
+/// * `net.StreamSocket.waitUntilConnected`
+/// * `net.waitUntilInputAvailable`
+/// * `net.Address.waitUntilResolved`
+/// * `net.StreamSocket.waitUntilDrained`
+///
+/// All of these functions offer a timeout, which allow for a maximum wait time, an immediate non-blocking query, or an infinite wait.
+///
+/// Finally, SDL net offers a way to simulate network problems, to test the always-less-than-ideal conditions in the real world.
+/// One can programmatically make the app behave like it's on a flakey wifi connection even if it's running wired directly to a gigabit fiber line.
+/// The functions:
+/// * `net.simulateAddressResolutionLoss`
+/// * `net.StreamSocket.simulatePacketLoss`
+/// * `net.DatagramSocket.simulatePacketLoss`
+///
 /// If there are errors using this, you need to ensure `ext_net` is set to `true`.
 pub const net = @import("net.zig");
 
