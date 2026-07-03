@@ -1300,7 +1300,7 @@ pub const Type = enum(c.SDL_GamepadType) {
     switch_joycon_left = c.SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT,
     switch_joycon_right = c.SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT,
     switch_joycon_pair = c.SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR,
-    // gamecube = c.SDL_GAMEPAD_TYPE_GAMECUBE,
+    gamecube = c.SDL_GAMEPAD_TYPE_GAMECUBE,
 
     /// Convert from SDL.
     pub fn fromSdl(value: c.SDL_GamepadType) ?Type {
