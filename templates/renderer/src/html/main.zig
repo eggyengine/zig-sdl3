@@ -128,7 +128,7 @@ pub fn iterate(
 
     // Draw debug FPS.
     var fps_text_buf: [32]u8 = undefined;
-    const fps_text = std.fmt.bufPrintZ(&fps_text_buf, "FPS: {d}", .{app_state.frame_capper.getObservedFps()}) catch "[Err]";
+    const fps_text = std.fmt.bufPrintSentinel(&fps_text_buf, "FPS: {d}", .{app_state.frame_capper.getObservedFps()}, 0) catch "[Err]";
     try app_state.renderer.renderDebugText(.{ .x = 0, .y = 0 }, fps_text);
 
     // Finish and return.

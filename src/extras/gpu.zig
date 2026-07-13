@@ -241,9 +241,9 @@ pub fn loadComputePipelineFromDirWithMetadata(
     const metadata = try std.zon.parse.fromSlice(ComputePipelineMetadata, allocator, zon_data, null, .{});
 
     const supported_formats = device.getShaderFormats();
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@field(supported_formats, field.name)) {
-            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field.name }), .{})) |file| {
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
+        if (@field(supported_formats, field_name)) {
+            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field_name }), .{})) |file| {
                 defer file.close(io);
 
                 var kernel_file = std.Io.Writer.Allocating.init(allocator);
@@ -254,7 +254,7 @@ pub fn loadComputePipelineFromDirWithMetadata(
                 defer allocator.free(kernel_data);
 
                 var created_format = gpu.ShaderFormatFlags{};
-                @field(created_format, field.name) = true;
+                @field(created_format, field_name) = true;
                 return .{
                     try device.createComputePipeline(.{
                         .code = kernel_data,
@@ -299,11 +299,11 @@ pub fn loadComputePipelineWithMetadata(
     name: ?[:0]const u8,
 ) !gpu.ComputePipeline {
     const supported_formats = device.getShaderFormats();
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@field(supported_formats, field.name)) {
-            if (compute_kernels.get(comptime std.meta.stringToEnum(ShaderFormat, field.name).?)) |kernel| {
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
+        if (@field(supported_formats, field_name)) {
+            if (compute_kernels.get(comptime std.meta.stringToEnum(ShaderFormat, field_name).?)) |kernel| {
                 var created_format = gpu.ShaderFormatFlags{};
-                @field(created_format, field.name) = true;
+                @field(created_format, field_name) = true;
                 return try device.createComputePipeline(.{
                     .code = kernel,
                     .entry_point = entry_point,
@@ -393,9 +393,9 @@ pub fn loadGraphicsShaderFromDirWithMetadata(
     defer std.zon.parse.free(allocator, metadata);
 
     const supported_formats = device.getShaderFormats();
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@field(supported_formats, field.name)) {
-            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field.name }), .{})) |file| {
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
+        if (@field(supported_formats, field_name)) {
+            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field_name}), .{})) |file| {
                 defer file.close(io);
 
                 var shader_file = std.Io.Writer.Allocating.init(allocator);
@@ -406,7 +406,7 @@ pub fn loadGraphicsShaderFromDirWithMetadata(
                 defer allocator.free(shader_data);
 
                 var created_format = gpu.ShaderFormatFlags{};
-                @field(created_format, field.name) = true;
+                @field(created_format, field_name) = true;
                 return try device.createShader(.{
                     .code = shader_data,
                     .entry_point = entry_point,
@@ -446,11 +446,11 @@ pub fn loadGraphicsShaderWithMetadata(
     name: ?[:0]const u8,
 ) !gpu.Shader {
     const supported_formats = device.getShaderFormats();
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@field(supported_formats, field.name)) {
-            if (shaders.get(comptime std.meta.stringToEnum(ShaderFormat, field.name).?)) |shader| {
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
+        if (@field(supported_formats, field_name)) {
+            if (shaders.get(comptime std.meta.stringToEnum(ShaderFormat, field_name).?)) |shader| {
                 var created_format = gpu.ShaderFormatFlags{};
-                @field(created_format, field.name) = true;
+                @field(created_format, field_name) = true;
                 return try device.createShader(.{
                     .code = shader,
                     .entry_point = entry_point,

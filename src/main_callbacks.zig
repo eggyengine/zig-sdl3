@@ -16,7 +16,7 @@ const AppState = struct {
 };
 
 fn getAppStateType() type {
-    return @typeInfo(@typeInfo(@typeInfo(@TypeOf(root.init)).@"fn".return_type.?).error_union.payload).@"struct".fields[0].type;
+    return @typeInfo(@typeInfo(@typeInfo(@TypeOf(root.init)).@"fn".return_type.?).error_union.payload).@"struct".field_types[0];
 }
 
 /// This will be called once before anything else.
@@ -72,13 +72,13 @@ pub export fn SDL_AppInit(
             @compileError("The init function is missing and is required to infer user data type");
         const init_info = @typeInfo(@TypeOf(root.init));
         if (init_info != .@"fn" or
-            init_info.@"fn".params.len != 1 or
+            init_info.@"fn".param_types.len != 1 or
             init_info.@"fn".return_type == null or
             @typeInfo(init_info.@"fn".return_type.?) != .error_union or
             @typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload) != .@"struct" or
             !@typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload).@"struct".is_tuple or
-            @typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload).@"struct".fields.len != 2 or
-            @typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload).@"struct".fields[1].type != sdl3.AppResult)
+            @typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload).@"struct".field_types.len != 2 or
+            @typeInfo(@typeInfo(init_info.@"fn".return_type.?).error_union.payload).@"struct".field_types[1] != sdl3.AppResult)
         {
             @compileError("The init function must be type fn (sdl3.Init) !struct { AppState, sdl3.AppResult } not " ++ @typeName(@TypeOf(root.init)));
         }
@@ -170,8 +170,8 @@ pub export fn SDL_AppIterate(
         if (@hasDecl(root, "iterate")) {
             const fn_info = @typeInfo(@TypeOf(root.iterate));
             if (fn_info != .@"fn" or
-                fn_info.@"fn".params.len != 1 or
-                fn_info.@"fn".params[0].type != *getAppStateType() or
+                fn_info.@"fn".param_types.len != 1 or
+                fn_info.@"fn".param_types[0] != *getAppStateType() or
                 fn_info.@"fn".return_type == null or
                 @typeInfo(fn_info.@"fn".return_type.?) != .error_union or
                 @typeInfo(fn_info.@"fn".return_type.?).error_union.payload != sdl3.AppResult)
@@ -243,9 +243,9 @@ pub export fn SDL_AppEvent(
         if (@hasDecl(root, "event")) {
             const fn_info = @typeInfo(@TypeOf(root.event));
             if (fn_info != .@"fn" or
-                fn_info.@"fn".params.len != 2 or
-                fn_info.@"fn".params[0].type != *getAppStateType() or
-                fn_info.@"fn".params[1].type != sdl3.events.Event or
+                fn_info.@"fn".param_types.len != 2 or
+                fn_info.@"fn".param_types[0] != *getAppStateType() or
+                fn_info.@"fn".param_types[1] != sdl3.events.Event or
                 fn_info.@"fn".return_type == null or
                 @typeInfo(fn_info.@"fn".return_type.?) != .error_union or
                 @typeInfo(fn_info.@"fn".return_type.?).error_union.payload != sdl3.AppResult)
@@ -314,9 +314,9 @@ pub export fn SDL_AppQuit(
         if (@hasDecl(root, "quit")) {
             const fn_info = @typeInfo(@TypeOf(root.quit));
             if (fn_info != .@"fn" or
-                fn_info.@"fn".params.len != 2 or
-                fn_info.@"fn".params[0].type != ?*getAppStateType() or
-                fn_info.@"fn".params[1].type != sdl3.AppResult or
+                fn_info.@"fn".param_types.len != 2 or
+                fn_info.@"fn".param_types[0] != ?*getAppStateType() or
+                fn_info.@"fn".param_types[1] != sdl3.AppResult or
                 fn_info.@"fn".return_type != void)
             {
                 @compileError("The quit function must be type fn (" ++ @typeName(?*getAppStateType()) ++ ", sdl3.AppResult) void not " ++ @typeName(@TypeOf(root.quit)));

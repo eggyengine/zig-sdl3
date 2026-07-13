@@ -1551,7 +1551,8 @@ pub const Renderer = struct {
         comptime fmt: []const u8,
         args: anytype,
     ) !void {
-        var fallback = std.heap.stackFallback(options.renderer_debug_text_stack_size, sdl3.allocator);
+        var fallback_buf: [options.renderer_debug_text_stack_size]u8 = undefined;
+        var fallback: std.heap.BufferFirstAllocator = .init(&fallback_buf, sdl3.allocator);
         const allocator = fallback.get();
         const msg = try std.fmt.allocPrintSentinel(allocator, fmt, args, 0);
         defer allocator.free(msg);

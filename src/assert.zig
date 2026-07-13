@@ -340,7 +340,7 @@ pub fn getHandler() struct { HandlerC, ?*anyopaque } {
 pub fn getReport() ?AssertData {
     const ret = c.SDL_GetAssertionReport();
     if (ret) |val|
-        return @bitCast(val.*);
+        return @as(*const AssertData, @ptrCast(val)).*;
     return null;
 }
 
@@ -414,7 +414,7 @@ pub fn setHandler(
 ) void {
     const Cb = struct {
         pub fn run(assert_data_c: [*c]const c.SDL_AssertData, user_data_c: ?*anyopaque) callconv(.c) c.SDL_AssertState {
-            return @intFromEnum(handler.?(@bitCast(assert_data_c.*), @ptrCast(@alignCast(user_data_c))));
+            return @intFromEnum(handler.?(@as(*const AssertData, @ptrCast(assert_data_c)).*, @ptrCast(@alignCast(user_data_c))));
         }
     };
     c.SDL_SetAssertionHandler(if (handler != null) Cb.run else null, @ptrCast(user_data));

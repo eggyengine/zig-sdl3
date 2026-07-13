@@ -85,7 +85,7 @@ pub fn prepareSdl(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     public: bool,
-) *std.Build.Module {
+) !*std.Build.Module {
     const c_source_code = b.fmt(
         \\#include <SDL3/SDL.h>
         \\{s}
@@ -176,7 +176,7 @@ pub fn prepareSdl(
         translate_c.linkSystemLibrary("sdl3", .{});
         translate_main_c.linkSystemLibrary("sdl3", .{});
     } else {
-        if (b.lazyDependency("sdl", .{
+        const sdl_dep = try b.dependencyLazy("sdl", .{
             .target = target,
             .optimize = optimize,
             .preferred_linkage = cfg.c_sdl_preferred_linkage,
@@ -185,16 +185,15 @@ pub fn prepareSdl(
             .lto = cfg.c_sdl_lto,
             .emscripten_pthreads = cfg.c_sdl_emscripten_pthreads,
             .install_build_config_h = cfg.c_sdl_install_build_config_h,
-        })) |sdl_dep| {
-            const lib = sdl_dep.artifact("SDL3");
-            if (cfg.sdl_system_include_path) |val|
-                lib.root_module.addSystemIncludePath(val);
-            b.installArtifact(lib);
-            translate_c.addIncludePath(sdl_dep.path("include"));
-            translate_main_c.addIncludePath(sdl_dep.path("include"));
-            sdl3.linkLibrary(lib);
-            sdl_dep_lib = lib;
-        }
+        });
+        const lib = sdl_dep.artifact("SDL3");
+        if (cfg.sdl_system_include_path) |val|
+            lib.root_module.addSystemIncludePath(val);
+        b.installArtifact(lib);
+        translate_c.addIncludePath(sdl_dep.path("include"));
+        translate_main_c.addIncludePath(sdl_dep.path("include"));
+        sdl3.linkLibrary(lib);
+        sdl_dep_lib = lib;
     }
 
     const ext_linkage = if (cfg.system_sdl) .dynamic else cfg.c_sdl_preferred_linkage;
@@ -235,11 +234,7 @@ pub fn build(
     const c_sdl_emscripten_pthreads = b.option(bool, "c_sdl_emscripten_pthreads", "Build with pthreads support when targeting Emscripten (default: false)") orelse false;
     const c_sdl_install_build_config_h = b.option(bool, "c_sdl_install_build_config_h", "Additionally install 'SDL_build_config.h' when installing SDL (default: false)") orelse false;
     const sdl_system_include_path = b.option(std.Build.LazyPath, "sdl_system_include_path", "System include path for SDL");
-    const sdl_sysroot_path = b.option(std.Build.LazyPath, "sdl_sysroot_path", "System include path for SDL");
 
-    if (sdl_sysroot_path) |val| {
-        b.sysroot = val.getPath(b);
-    }
     const system_sdl = b.systemIntegrationOption("sdl", .{});
 
     // SDL options.
@@ -313,13 +308,13 @@ pub fn build(
         .sdl_system_include_path = sdl_system_include_path,
         .system_sdl = system_sdl,
     };
-    _ = prepareSdl(b, sdl_config, target, optimize, true);
+    _ = try prepareSdl(b, sdl_config, target, optimize, true);
     sdl_config.ext_image = ext_image_opts;
     sdl_config.ext_mixer = ext_mixer_opts;
     sdl_config.ext_net = ext_net_opts;
     sdl_config.ext_shadercross = ext_shadercross_opts;
     sdl_config.ext_ttf = ext_ttf_opts;
-    const sdl3_full = prepareSdl(b, sdl_config, target, optimize, false);
+    const sdl3_full = try prepareSdl(b, sdl_config, target, optimize, false);
 
     setupDocs(b, sdl3_full);
     setupExamples(b, sdl3_full, target, optimize);

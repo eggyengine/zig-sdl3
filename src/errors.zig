@@ -34,11 +34,11 @@ pub inline fn assertStructsEqual(
         std.debug.assert(@sizeOf(A) == @sizeOf(B));
         const info_a = @typeInfo(A).@"struct";
         const info_b = @typeInfo(B).@"struct";
-        const num_fields = info_a.fields.len;
-        std.debug.assert(info_b.fields.len == num_fields);
+        const num_fields = info_a.field_names.len;
+        std.debug.assert(info_b.field_names.len == num_fields);
         for (0..num_fields) |ind| {
-            std.debug.assert(@offsetOf(A, info_a.fields[ind].name) == @offsetOf(B, info_b.fields[ind].name));
-            std.debug.assert(@sizeOf(@FieldType(A, info_a.fields[ind].name)) == @sizeOf(@FieldType(B, info_b.fields[ind].name)));
+            std.debug.assert(@offsetOf(A, info_a.field_names[ind]) == @offsetOf(B, info_b.field_names[ind]));
+            std.debug.assert(@sizeOf(@FieldType(A, info_a.field_names[ind])) == @sizeOf(@FieldType(B, info_b.field_names[ind])));
         }
     }
 }
@@ -130,13 +130,13 @@ pub fn get() ?[:0]const u8 {
 pub fn refAllDeclsRecursive(comptime T: type) void {
     if (!builtin.is_test) return;
     inline for (comptime std.meta.declarations(T)) |decl| {
-        if (@TypeOf(@field(T, decl.name)) == type) {
-            switch (@typeInfo(@field(T, decl.name))) {
-                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
+        if (@TypeOf(@field(T, decl)) == type) {
+            switch (@typeInfo(@field(T, decl))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl)),
                 else => {},
             }
         }
-        _ = &@field(T, decl.name);
+        _ = &@field(T, decl);
     }
 }
 

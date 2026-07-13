@@ -17,8 +17,8 @@
             .hash = "harfbuzz-14.1.0-Ip1VAuGZAAC1jdxPHOMPoHyi-50Hm_q4bveaVflELHGw",
         },
         .sdl = .{
-            .url = "git+https://github.com/castholm/SDL.git?ref=v0.4.0%2B3.4.0#ae5deb068787bd71d9aadbc054ff1af54f5d058c",
-            .hash = "sdl-0.4.0+3.4.0-SDL--u6yowGyvoiJ5qkFm_T1-MpmvnHShh2q2mTZf1fo",
+            .url = "git+https://github.com/eli-leathe/SDL#652c033735a6f74d914e1583688287cdb8e2336e",
+            .hash = "sdl-0.5.2+3.4.12-SDL--oLHpwFgpMS-u30b5hkDfnb-5fZbqaIHSQ4GB5le",
             .lazy = true,
         },
         .sdl_image = .{

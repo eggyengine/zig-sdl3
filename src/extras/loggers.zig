@@ -87,7 +87,7 @@ pub fn sdlMessageBox(
     } else "Unknown";
     var buf: [options.log_message_stack_size]u8 = undefined;
     const too_long = "SDL message too long, please increase the `log_message_stack_size` build option";
-    const text = if (category_str) |val| std.fmt.bufPrintZ(&buf, "{s}: {s}", .{ val, message }) catch too_long else message;
+    const text = if (category_str) |val| std.fmt.bufPrintSentinel(&buf, "{s}: {s}", .{ val, message }, 0) catch too_long else message;
     message_box.showSimple(
         .{
             .information_dialog = priority == .info,
