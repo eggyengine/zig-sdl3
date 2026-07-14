@@ -4398,9 +4398,9 @@ pub const TextureCreateInfo = struct {
     height: u32,
     /// The layer count or depth of the texture.
     /// This value is treated as a layer count on 2D array textures, and as a depth value on 3D textures.
-    layer_count_or_depth: u32 = 0,
+    layer_count_or_depth: u32 = 1,
     /// The number of mip levels in the texture.
-    num_levels: u32 = 0,
+    num_levels: u32 = 1,
     /// The number of samples per texel.
     /// Only applies if the texture is used as a render target.
     sample_count: SampleCount = .no_multisampling,
