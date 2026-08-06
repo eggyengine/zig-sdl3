@@ -228,7 +228,7 @@ pub fn build(
 
     // C SDL options.
     const c_sdl_preferred_linkage = b.option(std.builtin.LinkMode, "c_sdl_preferred_linkage", "Prefer building statically or dynamically linked libraries (default: static)") orelse .static;
-    const c_sdl_strip = b.option(bool, "c_sdl_strip", "Strip debug symbols (default: varies)") orelse (optimize == .ReleaseSmall);
+    const c_sdl_strip = b.option(bool, "c_sdl_strip", "Strip debug symbols (default: varies)") orelse (optimize == .small);
     const c_sdl_sanitize_c = b.option(std.zig.SanitizeC, "c_sdl_sanitize_c", "Detect C undefined behavior (default: trap)") orelse .trap;
     const c_sdl_lto = b.option(std.zig.LtoMode, "c_sdl_lto", "Perform link time optimization (default: false)") orelse .none;
     const c_sdl_emscripten_pthreads = b.option(bool, "c_sdl_emscripten_pthreads", "Build with pthreads support when targeting Emscripten (default: false)") orelse false;
