@@ -1,6 +1,8 @@
 const std = @import("std");
 const zig = @import("builtin");
 
+const Translator = @import("translate_c").Translator;
+
 pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
 pub const image = @import("build/image.zig");
 pub const mixer = @import("build/mixer.zig");
@@ -86,6 +88,8 @@ pub fn prepareSdl(
     optimize: std.builtin.OptimizeMode,
     public: bool,
 ) !*std.Build.Module {
+    const translate_c = b.dependency("translate_c", .{});
+
     const c_source_code = b.fmt(
         \\#include <SDL3/SDL.h>
         \\{s}
@@ -106,50 +110,52 @@ pub fn prepareSdl(
         if (cfg.ext_ttf != null) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
     });
 
-    const c_source_file_step = b.addWriteFiles();
-    const c_source_path = c_source_file_step.add("c.c", c_source_code);
+    const link_system_libs: []const Translator.LinkSystemLib = if (cfg.system_sdl) &.{.{ .name = "sdl3" }} else &.{};
 
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = c_source_path,
+    const c_source_file_step = b.addWriteFiles();
+    const sdl_c: Translator = .init(translate_c, .{
+        .name = "c",
+        .c_source_file = c_source_file_step.add("c.c", c_source_code),
         .target = target,
         .optimize = optimize,
+        .default_init = true,
+        .link_system_libs = link_system_libs,
     });
 
     if (cfg.sdl_system_include_path) |val|
-        translate_c.addSystemIncludePath(val);
-
-    const c_module = translate_c.createModule();
+        sdl_c.addSystemIncludePath(val);
 
     const main_c_source_code =
         \\#define SDL_MAIN_USE_CALLBACKS
         \\#include "SDL3/SDL_main.h"
     ;
     const main_c_source_file_step = b.addWriteFiles();
-    const main_c_source_path = main_c_source_file_step.add("main.c", main_c_source_code);
-    const translate_main_c = b.addTranslateC(.{
-        .root_source_file = main_c_source_path,
+    const sdl_main_c: Translator = .init(translate_c, .{
+        .name = "sdl_main",
+        .c_source_file = main_c_source_file_step.add("main.c", main_c_source_code),
         .target = target,
         .optimize = optimize,
+        .default_init = true,
+        .link_system_libs = link_system_libs,
     });
     if (cfg.sdl_system_include_path) |val|
-        translate_main_c.addSystemIncludePath(val);
-    const main_c_module = translate_main_c.createModule();
+        sdl_main_c.addSystemIncludePath(val);
 
     const sdl3 = if (public) b.addModule("sdl3", .{
         .root_source_file = b.path("src/sdl3.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "c", .module = c_module },
-            .{ .name = "sdl_main", .module = main_c_module },
+            .{ .name = "c", .module = sdl_c.mod },
+            .{ .name = "sdl_main", .module = sdl_main_c.mod },
         },
     }) else b.createModule(.{
         .root_source_file = b.path("src/sdl3.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "c", .module = c_module },
-            .{ .name = "sdl_main", .module = main_c_module },
+            .{ .name = "c", .module = sdl_c.mod },
+            .{ .name = "sdl_main", .module = sdl_main_c.mod },
         },
     });
 
@@ -173,8 +179,6 @@ pub fn prepareSdl(
     var sdl_dep_lib: ?*std.Build.Step.Compile = null;
     if (cfg.system_sdl) {
         sdl3.linkSystemLibrary("sdl3", .{});
-        translate_c.linkSystemLibrary("sdl3", .{});
-        translate_main_c.linkSystemLibrary("sdl3", .{});
     } else {
         const sdl_dep = try b.dependencyLazy("sdl", .{
             .target = target,
@@ -190,8 +194,8 @@ pub fn prepareSdl(
         if (cfg.sdl_system_include_path) |val|
             lib.root_module.addSystemIncludePath(val);
         b.installArtifact(lib);
-        translate_c.addIncludePath(sdl_dep.path("include"));
-        translate_main_c.addIncludePath(sdl_dep.path("include"));
+        sdl_c.addIncludePath(sdl_dep.path("include"));
+        sdl_main_c.addIncludePath(sdl_dep.path("include"));
         sdl3.linkLibrary(lib);
         sdl_dep_lib = lib;
     }
@@ -203,7 +207,7 @@ pub fn prepareSdl(
         .sdl3 = sdl3,
         .sdl_dep_lib = sdl_dep_lib,
         .system_include_path = cfg.sdl_system_include_path,
-        .translate_c = translate_c,
+        .translate_c = sdl_c,
     };
 
     if (cfg.ext_image) |opts|

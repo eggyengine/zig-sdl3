@@ -1,7 +1,7 @@
 .{
     .name = .sdl3,
     .version = "0.2.2",
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .dxc = .{
             .url = "git+https://github.com/Gota7/dxc-build?ref=zig-sdl3#a60f9fae53dac7a792f6407f8b0352e8b1f1a22e",
@@ -55,6 +55,10 @@
             .url = "git+https://github.com/KhronosGroup/SPIRV-Headers#1bfd27101e4578d0284061bdf8f09fb4755c7c2d",
             .hash = "N-V-__8AADq1MQCCoUh-qOkYXGvqKFClPzdiedYrsGFYzTV9",
             .lazy = true,
+        },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=2.0.0#0da7a16c3235b935b82421646076e0657cda21f6",
+            .hash = "translate_c-2.0.0-Q_BUWltOBwA0229IE8wwSxxGzOxyRso3hvcb1nN8oJX_",
         },
     },
     .paths = .{
