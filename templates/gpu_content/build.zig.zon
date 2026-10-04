@@ -1,7 +1,7 @@
 .{
     .name = .sdl3_gpu_content_template,
     .version = "0.0.1",
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         // Replace this with `zig fetch --save=sdl3 git+https://codeberg.org/7Games/zig-sdl3#master` or the version of your choice.
         .sdl3 = .{

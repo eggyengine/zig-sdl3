@@ -58,7 +58,7 @@ pub fn init(
     const allocated = try allocator.create(Allocated);
     errdefer allocator.destroy(allocated);
 
-    const is_wasm = builtin.cpu.arch.isWasm();
+    const is_wasm = builtin.target.cpu.arch.isWasm();
     const use_safe_allocator = !is_wasm and switch (builtin.mode) {
         .Debug, .ReleaseSafe => true,
         .ReleaseFast, .ReleaseSmall => !builtin.link_libc and builtin.single_threaded, // Also not ideal.

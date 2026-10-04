@@ -1,11 +1,10 @@
+const std = @import("std");
+
 const errors = @import("../errors.zig");
 const gpu = @import("../gpu.zig");
 const log = @import("../log.zig");
-const std = @import("std");
-
 /// Metadata for compute pipelines.
 pub const ComputePipelineMetadata = @import("gpu/ComputePipelineMetadata.zig");
-
 /// Metadata for graphics shaders.
 pub const GraphicsShaderMetadata = @import("gpu/GraphicsShaderMetadata.zig");
 
@@ -238,7 +237,16 @@ pub fn loadComputePipelineFromDirWithMetadata(
     _ = try zon_reader.interface.streamRemaining(&zon_file.writer);
     const zon_data = try zon_file.toOwnedSliceSentinel(0);
     defer allocator.free(zon_data);
-    const metadata = try std.zon.parse.fromSlice(ComputePipelineMetadata, allocator, zon_data, null, .{});
+
+    var metadata_arena: std.heap.ArenaAllocator = .init(allocator);
+    defer metadata_arena.deinit();
+    var diagnostics: std.zon.parse.Diagnostics = undefined;
+    const metadata = try std.zon.parse.fromSliceNoAlloc(ComputePipelineMetadata, .{
+        .gpa = allocator,
+        .arena = metadata_arena.allocator(),
+        .source = zon_data,
+        .diagnostics = &diagnostics,
+    });
 
     const supported_formats = device.getShaderFormats();
     inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
@@ -389,13 +397,21 @@ pub fn loadGraphicsShaderFromDirWithMetadata(
     _ = try zon_reader.interface.streamRemaining(&zon_file.writer);
     const zon_data = try zon_file.toOwnedSliceSentinel(0);
     defer allocator.free(zon_data);
-    const metadata = try std.zon.parse.fromSliceAlloc(GraphicsShaderMetadata, allocator, zon_data, null, .{});
-    defer std.zon.parse.free(allocator, metadata);
+
+    var metadata_arena: std.heap.ArenaAllocator = .init(allocator);
+    defer metadata_arena.deinit();
+    var diagnostics: std.zon.parse.Diagnostics = undefined;
+    const metadata = try std.zon.parse.fromSlice(GraphicsShaderMetadata, .{
+        .gpa = allocator,
+        .arena = metadata_arena.allocator(),
+        .source = zon_data,
+        .diagnostics = &diagnostics,
+    });
 
     const supported_formats = device.getShaderFormats();
     inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |field_name| {
         if (@field(supported_formats, field_name)) {
-            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field_name}), .{})) |file| {
+            if (dir.openFile(io, try std.fmt.bufPrint(&file_path, "{s}.{s}", .{ name, field_name }), .{})) |file| {
                 defer file.close(io);
 
                 var shader_file = std.Io.Writer.Allocating.init(allocator);

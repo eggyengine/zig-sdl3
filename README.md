@@ -24,7 +24,7 @@ Some advantages of SDL3 include windowing, audio, gamepad, keyboard, mouse, rend
 
 # Building and using
 
-To use zig-sdl3 with zig 0.16.0, you need to add it as a dependency to your project.
+To use zig-sdl3 with zig 0.17.0, you need to add it as a dependency to your project.
 The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
