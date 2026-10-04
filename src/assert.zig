@@ -362,12 +362,12 @@ pub fn report(
     data: *AssertData,
     location: std.builtin.SourceLocation,
 ) State {
-    return @enumFromInt(c.SDL_ReportAssertion(
+    return @fromBackingInt(@intCast(c.SDL_ReportAssertion(
         @ptrCast(data),
         location.fn_name,
         location.file,
         @intCast(location.line),
-    ));
+    )));
 }
 
 /// Clear the list of all assertion failures.
@@ -414,7 +414,7 @@ pub fn setHandler(
 ) void {
     const Cb = struct {
         pub fn run(assert_data_c: [*c]const c.SDL_AssertData, user_data_c: ?*anyopaque) callconv(.c) c.SDL_AssertState {
-            return @intFromEnum(handler.?(@as(*const AssertData, @ptrCast(assert_data_c)).*, @ptrCast(@alignCast(user_data_c))));
+            return @backingInt(handler.?(@as(*const AssertData, @ptrCast(assert_data_c)).*, @ptrCast(@alignCast(user_data_c))));
         }
     };
     c.SDL_SetAssertionHandler(if (handler != null) Cb.run else null, @ptrCast(user_data));

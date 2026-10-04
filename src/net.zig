@@ -859,14 +859,14 @@ pub const Status = enum(c.NET_Status) {
             errors.callErrorCallback();
             return error.SdlError;
         }
-        return @enumFromInt(value);
+        return @fromBackingInt(@intCast(value));
     }
 
     /// Convert to an SDL value.
     pub fn toSdl(
         self: Status,
     ) c.NET_Status {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 };
 

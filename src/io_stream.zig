@@ -161,7 +161,7 @@ pub fn Interface(comptime UserData: type) type {
                 /// ## Return Value
                 /// The final offset in the data stream, or `-1` on error.
                 pub fn seek_c(user_data_c: ?*anyopaque, offset_c: i64, whence_c: c.SDL_IOWhence) callconv(.c) i64 {
-                    const ret = self.seek.?(@ptrCast(@alignCast(user_data_c)), @intCast(offset_c), @enumFromInt(whence_c)) catch return -1;
+                    const ret = self.seek.?(@ptrCast(@alignCast(user_data_c)), @intCast(offset_c), @fromBackingInt(@intCast(whence_c))) catch return -1;
                     return @intCast(ret);
                 }
 
@@ -1660,7 +1660,7 @@ pub const Stream = struct {
         return @intCast(try errors.wrapCall(i64, c.SDL_SeekIO(
             self.value,
             @intCast(offset),
-            @intFromEnum(whence),
+            @backingInt(whence),
         ), -1));
     }
 

@@ -110,7 +110,7 @@ pub export fn SDL_AppInit(
     };
     @as(*getAppStateType(), @ptrCast(@alignCast(state.user_data))).* = ret_user_data;
     app_state.* = state;
-    return @intFromEnum(ret);
+    return @backingInt(ret);
 }
 
 /// This is called over and over, possibly at the refresh rate of the display or some other metric that the platform dictates.
@@ -190,7 +190,7 @@ pub export fn SDL_AppIterate(
             }
             return c.SDL_APP_FAILURE;
         };
-        return @intFromEnum(ret);
+        return @backingInt(ret);
     } else return c.SDL_APP_CONTINUE;
 }
 
@@ -264,7 +264,7 @@ pub export fn SDL_AppEvent(
             }
             return c.SDL_APP_FAILURE;
         };
-        return @intFromEnum(ret);
+        return @backingInt(ret);
     } else return c.SDL_APP_CONTINUE;
 }
 
@@ -326,7 +326,7 @@ pub export fn SDL_AppQuit(
 
     const state: ?*AppState = if (app_state) |val| @ptrCast(@alignCast(val)) else null;
     if (@hasDecl(root, "quit")) {
-        root.quit(if (state) |val| @ptrCast(@alignCast(val.user_data)) else null, @enumFromInt(result));
+        root.quit(if (state) |val| @ptrCast(@alignCast(val.user_data)) else null, @fromBackingInt(@intCast(result)));
     }
     if (state) |val| {
         std.heap.c_allocator.destroy(@as(*getAppStateType(), @ptrCast(@alignCast(val.user_data))));

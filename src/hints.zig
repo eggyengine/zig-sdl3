@@ -798,7 +798,7 @@ pub fn setWithPriority(
     const ret = c.SDL_SetHintWithPriority(
         hint.toSdl(),
         value.ptr,
-        @intFromEnum(priority),
+        @backingInt(priority),
     );
     return errors.wrapCallBool(ret);
 }
