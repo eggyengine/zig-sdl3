@@ -57,7 +57,7 @@ pub const SdlConfig = struct {
     /// Enable the true type font extension.
     ext_ttf: ?ttf.Options = null,
     /// How to link C SDL.
-    c_sdl_preferred_linkage: std.builtin.LinkMode = .static,
+    c_sdl_preferred_linkage: std.lang.LinkMode = .static,
     /// If to strip C SDL.
     c_sdl_strip: bool = false,
     /// If to sanitize C SDL.
@@ -85,7 +85,7 @@ pub fn prepareSdl(
     b: *std.Build,
     cfg: SdlConfig,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     public: bool,
 ) !*std.Build.Module {
     const translate_c = b.dependency("translate_c", .{});
@@ -231,7 +231,7 @@ pub fn build(
     const optimize = b.standardOptimizeOption(.{});
 
     // C SDL options.
-    const c_sdl_preferred_linkage = b.option(std.builtin.LinkMode, "c_sdl_preferred_linkage", "Prefer building statically or dynamically linked libraries (default: static)") orelse .static;
+    const c_sdl_preferred_linkage = b.option(std.lang.LinkMode, "c_sdl_preferred_linkage", "Prefer building statically or dynamically linked libraries (default: static)") orelse .static;
     const c_sdl_strip = b.option(bool, "c_sdl_strip", "Strip debug symbols (default: varies)") orelse (optimize == .small);
     const c_sdl_sanitize_c = b.option(std.zig.SanitizeC, "c_sdl_sanitize_c", "Detect C undefined behavior (default: trap)") orelse .trap;
     const c_sdl_lto = b.option(std.zig.LtoMode, "c_sdl_lto", "Perform link time optimization (default: false)") orelse .none;
@@ -346,7 +346,7 @@ fn setupExample(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     name: []const u8,
     examples_step: *std.Build.Step,
 ) struct { *std.Build.Step.Compile, *std.Build.Step.InstallArtifact } {
@@ -382,7 +382,7 @@ fn setupExamples(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
 ) void {
     const examples_step = b.step("examples", "Build all examples");
     const run_example: ?[]const u8 = b.option([]const u8, "example", "The example name for running an example") orelse null;
