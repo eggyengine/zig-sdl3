@@ -51,7 +51,7 @@ pub fn sdlMessageBox(
     err: ?[]const u8,
 ) void {
     var buf: [options.log_message_stack_size]u8 = undefined;
-    const err_msg = if (err) |val| std.fmt.bufPrintZ(&buf, "{s}", .{val}) catch "SDL message too long, please increase the `log_message_stack_size` build option" else "Unknown SDL error";
+    const err_msg = if (err) |val| std.fmt.bufPrintSentinel(&buf, "{s}", .{val}, 0) catch "SDL message too long, please increase the `log_message_stack_size` build option" else "Unknown SDL error";
     message_box.showSimple(.{ .error_dialog = true }, "SDL Error", err_msg, null) catch {};
 }
 

@@ -1,14 +1,15 @@
 const std = @import("std");
 const zig = @import("builtin");
 
+const Translator = @import("translate_c").Translator;
+
+pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
 pub const image = @import("build/image.zig");
 pub const mixer = @import("build/mixer.zig");
 pub const net = @import("build/net.zig");
 pub const shadercross = @import("build/shadercross.zig");
 pub const shaders = @import("build/shaders.zig");
 pub const ttf = @import("build/ttf.zig");
-
-pub const ExtensionConfig = @import("build/ExtensionConfig.zig");
 
 /// List of example programs to compile from the examples folder.
 const examples = [_][]const u8{
@@ -56,7 +57,7 @@ pub const SdlConfig = struct {
     /// Enable the true type font extension.
     ext_ttf: ?ttf.Options = null,
     /// How to link C SDL.
-    c_sdl_preferred_linkage: std.builtin.LinkMode = .static,
+    c_sdl_preferred_linkage: std.lang.LinkMode = .static,
     /// If to strip C SDL.
     c_sdl_strip: bool = false,
     /// If to sanitize C SDL.
@@ -84,9 +85,11 @@ pub fn prepareSdl(
     b: *std.Build,
     cfg: SdlConfig,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     public: bool,
-) *std.Build.Module {
+) !*std.Build.Module {
+    const translate_c = b.dependency("translate_c", .{});
+
     const c_source_code = b.fmt(
         \\#include <SDL3/SDL.h>
         \\{s}
@@ -107,33 +110,52 @@ pub fn prepareSdl(
         if (cfg.ext_ttf != null) "#include <SDL3_ttf/SDL_ttf.h>\n#include <SDL3_ttf/SDL_textengine.h>\n" else "",
     });
 
-    const c_source_file_step = b.addWriteFiles();
-    const c_source_path = c_source_file_step.add("c.c", c_source_code);
+    const link_system_libs: []const Translator.LinkSystemLib = if (cfg.system_sdl) &.{.{ .name = "sdl3" }} else &.{};
 
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = c_source_path,
+    const c_source_file_step = b.addWriteFiles();
+    const sdl_c: Translator = .init(translate_c, .{
+        .name = "c",
+        .c_source_file = c_source_file_step.add("c.c", c_source_code),
         .target = target,
         .optimize = optimize,
+        .default_init = true,
+        .link_system_libs = link_system_libs,
     });
 
     if (cfg.sdl_system_include_path) |val|
-        translate_c.addSystemIncludePath(val);
+        sdl_c.addSystemIncludePath(val);
 
-    const c_module = translate_c.createModule();
+    const main_c_source_code =
+        \\#define SDL_MAIN_USE_CALLBACKS
+        \\#include "SDL3/SDL_main.h"
+    ;
+    const main_c_source_file_step = b.addWriteFiles();
+    const sdl_main_c: Translator = .init(translate_c, .{
+        .name = "sdl_main",
+        .c_source_file = main_c_source_file_step.add("main.c", main_c_source_code),
+        .target = target,
+        .optimize = optimize,
+        .default_init = true,
+        .link_system_libs = link_system_libs,
+    });
+    if (cfg.sdl_system_include_path) |val|
+        sdl_main_c.addSystemIncludePath(val);
 
     const sdl3 = if (public) b.addModule("sdl3", .{
         .root_source_file = b.path("src/sdl3.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "c", .module = c_module },
+            .{ .name = "c", .module = sdl_c.mod },
+            .{ .name = "sdl_main", .module = sdl_main_c.mod },
         },
     }) else b.createModule(.{
         .root_source_file = b.path("src/sdl3.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "c", .module = c_module },
+            .{ .name = "c", .module = sdl_c.mod },
+            .{ .name = "sdl_main", .module = sdl_main_c.mod },
         },
     });
 
@@ -157,9 +179,8 @@ pub fn prepareSdl(
     var sdl_dep_lib: ?*std.Build.Step.Compile = null;
     if (cfg.system_sdl) {
         sdl3.linkSystemLibrary("sdl3", .{});
-        translate_c.linkSystemLibrary("sdl3", .{});
     } else {
-        if (b.lazyDependency("sdl", .{
+        const sdl_dep = try b.dependencyLazy("sdl", .{
             .target = target,
             .optimize = optimize,
             .preferred_linkage = cfg.c_sdl_preferred_linkage,
@@ -168,15 +189,15 @@ pub fn prepareSdl(
             .lto = cfg.c_sdl_lto,
             .emscripten_pthreads = cfg.c_sdl_emscripten_pthreads,
             .install_build_config_h = cfg.c_sdl_install_build_config_h,
-        })) |sdl_dep| {
-            const lib = sdl_dep.artifact("SDL3");
-            if (cfg.sdl_system_include_path) |val|
-                lib.root_module.addSystemIncludePath(val);
-            b.installArtifact(lib);
-            translate_c.addIncludePath(sdl_dep.path("include"));
-            sdl3.linkLibrary(lib);
-            sdl_dep_lib = lib;
-        }
+        });
+        const lib = sdl_dep.artifact("SDL3");
+        if (cfg.sdl_system_include_path) |val|
+            lib.root_module.addSystemIncludePath(val);
+        b.installArtifact(lib);
+        sdl_c.addIncludePath(sdl_dep.path("include"));
+        sdl_main_c.addIncludePath(sdl_dep.path("include"));
+        sdl3.linkLibrary(lib);
+        sdl_dep_lib = lib;
     }
 
     const ext_linkage = if (cfg.system_sdl) .dynamic else cfg.c_sdl_preferred_linkage;
@@ -186,7 +207,7 @@ pub fn prepareSdl(
         .sdl3 = sdl3,
         .sdl_dep_lib = sdl_dep_lib,
         .system_include_path = cfg.sdl_system_include_path,
-        .translate_c = translate_c,
+        .translate_c = sdl_c,
     };
 
     if (cfg.ext_image) |opts|
@@ -210,18 +231,14 @@ pub fn build(
     const optimize = b.standardOptimizeOption(.{});
 
     // C SDL options.
-    const c_sdl_preferred_linkage = b.option(std.builtin.LinkMode, "c_sdl_preferred_linkage", "Prefer building statically or dynamically linked libraries (default: static)") orelse .static;
-    const c_sdl_strip = b.option(bool, "c_sdl_strip", "Strip debug symbols (default: varies)") orelse (optimize == .ReleaseSmall);
+    const c_sdl_preferred_linkage = b.option(std.lang.LinkMode, "c_sdl_preferred_linkage", "Prefer building statically or dynamically linked libraries (default: static)") orelse .static;
+    const c_sdl_strip = b.option(bool, "c_sdl_strip", "Strip debug symbols (default: varies)") orelse (optimize == .small);
     const c_sdl_sanitize_c = b.option(std.zig.SanitizeC, "c_sdl_sanitize_c", "Detect C undefined behavior (default: trap)") orelse .trap;
     const c_sdl_lto = b.option(std.zig.LtoMode, "c_sdl_lto", "Perform link time optimization (default: false)") orelse .none;
     const c_sdl_emscripten_pthreads = b.option(bool, "c_sdl_emscripten_pthreads", "Build with pthreads support when targeting Emscripten (default: false)") orelse false;
     const c_sdl_install_build_config_h = b.option(bool, "c_sdl_install_build_config_h", "Additionally install 'SDL_build_config.h' when installing SDL (default: false)") orelse false;
     const sdl_system_include_path = b.option(std.Build.LazyPath, "sdl_system_include_path", "System include path for SDL");
-    const sdl_sysroot_path = b.option(std.Build.LazyPath, "sdl_sysroot_path", "System include path for SDL");
 
-    if (sdl_sysroot_path) |val| {
-        b.sysroot = val.getPath(b);
-    }
     const system_sdl = b.systemIntegrationOption("sdl", .{});
 
     // SDL options.
@@ -295,13 +312,13 @@ pub fn build(
         .sdl_system_include_path = sdl_system_include_path,
         .system_sdl = system_sdl,
     };
-    _ = prepareSdl(b, sdl_config, target, optimize, true);
+    _ = try prepareSdl(b, sdl_config, target, optimize, true);
     sdl_config.ext_image = ext_image_opts;
     sdl_config.ext_mixer = ext_mixer_opts;
     sdl_config.ext_net = ext_net_opts;
     sdl_config.ext_shadercross = ext_shadercross_opts;
     sdl_config.ext_ttf = ext_ttf_opts;
-    const sdl3_full = prepareSdl(b, sdl_config, target, optimize, false);
+    const sdl3_full = try prepareSdl(b, sdl_config, target, optimize, false);
 
     setupDocs(b, sdl3_full);
     setupExamples(b, sdl3_full, target, optimize);
@@ -329,7 +346,7 @@ fn setupExample(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     name: []const u8,
     examples_step: *std.Build.Step,
 ) struct { *std.Build.Step.Compile, *std.Build.Step.InstallArtifact } {
@@ -365,7 +382,7 @@ fn setupExamples(
     b: *std.Build,
     sdl3: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
 ) void {
     const examples_step = b.step("examples", "Build all examples");
     const run_example: ?[]const u8 = b.option([]const u8, "example", "The example name for running an example") orelse null;

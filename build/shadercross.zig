@@ -1,5 +1,6 @@
-const ExtensionConfig = @import("ExtensionConfig.zig");
 const std = @import("std");
+
+const ExtensionConfig = @import("ExtensionConfig.zig");
 
 /// Options for SDL shadercross.
 pub const Options = struct {};
@@ -8,7 +9,7 @@ pub const Options = struct {};
 fn addDeps(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     system_include_path: ?std.Build.LazyPath,
     sdl_dep_lib: ?*std.Build.Step.Compile,
     link_cli: bool,
@@ -96,7 +97,7 @@ pub fn setup(
     extension_config: ExtensionConfig,
     options: Options,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     dxc_support: bool,
 ) void {
     _ = options;

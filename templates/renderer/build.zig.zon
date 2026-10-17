@@ -1,6 +1,7 @@
 .{
     .name = .sdl3_renderer_template,
     .version = "0.0.1",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .emsdk = .{
             .url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/4.0.3.tar.gz",
