@@ -1,10 +1,39 @@
-const gputils = @import("gputils.zig");
 const std = @import("std");
 
-const image_out = gputils.Texture2dRgba8(1, 0);
+pub const Image = @SpirvType(.{ .image = .{
+    .usage = .{ .storage = f32 },
+    .format = .rgba8unorm,
+    .dim = .@"2d",
+    .depth = .not_depth,
+    .arrayed = false,
+    .multisampled = false,
+    .access = .unknown,
+} });
 
-export fn main() callconv(.spirv_kernel) void {
-    // std.gpu.executionMode(main, .{ .local_size = .{ .x = 8, .y = 8, .z = 1 } }); // Set in build system by `spriv_execution_mode`.
+const image = @extern(
+    *addrspace(.constant) const Image,
+    .{
+        .name = "image",
+        .decoration = .{
+            .descriptor = .{
+                .set = 1,
+                .binding = 0,
+            },
+        },
+    },
+);
 
-    image_out.store(.{ std.gpu.global_invocation_id[0], std.gpu.global_invocation_id[1] }, .{ 1, 1, 0, 1 });
+export fn main() callconv(.{
+    .spirv_kernel = .{
+        .x = 8,
+        .y = 8,
+        .z = 1,
+    },
+}) void {
+    std.spirv.imageWrite(
+        image,
+        u32,
+        .{ std.spirv.global_invocation_id[0], std.spirv.global_invocation_id[1] },
+        .{ 1, 1, 0, 1 },
+    );
 }

@@ -1,10 +1,31 @@
-const gputils = @import("gputils.zig");
 const std = @import("std");
 
-const texture = gputils.Sampler2d(2, 0);
+pub const Image = @SpirvType(.{ .image = .{
+    .usage = .{ .sampled = f32 },
+    .format = .unknown,
+    .dim = .@"2d",
+    .depth = .not_depth,
+    .arrayed = false,
+    .multisampled = false,
+    .access = .unknown,
+} });
+pub const SampledImage = @SpirvType(.{ .sampled_image = Image });
+
+const sampled_image = @extern(
+    *addrspace(.constant) const SampledImage,
+    .{
+        .name = "sampled_image",
+        .decoration = .{
+            .descriptor = .{
+                .set = 2,
+                .binding = 0,
+            },
+        },
+    },
+);
 
 const tex_coord_in = @extern(
-    *addrspace(.input) @Vector(2, f32),
+    *addrspace(.input) const @Vector(2, f32),
     .{
         .name = "tex_coord",
         .decoration = .{
@@ -23,6 +44,6 @@ const color_out = @extern(
     },
 );
 
-export fn main() callconv(.spirv_fragment) void {
-    color_out.* = texture.texture(tex_coord_in.*);
+export fn main() callconv(.{ .spirv_fragment = .{} }) void {
+    color_out.* = std.spirv.imageSampleImplicitLod(sampled_image, tex_coord_in.*);
 }

@@ -4,8 +4,8 @@
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .dxc = .{
-            .url = "git+https://github.com/Gota7/dxc-build?ref=zig-sdl3#a60f9fae53dac7a792f6407f8b0352e8b1f1a22e",
-            .hash = "dxc-1.8.2505-siU2n6P4FQJNhZ0or2qPUx0C72_CdWUU15vI1h54sQC5",
+            .url = "git+https://github.com/Gota7/dxc-build?ref=zig-sdl3-master#98de581456b52e93ab60568d876f7d6d64a684e0",
+            .hash = "dxc-1.8.2505-siU2n4PyFQKP7dR5KfZx7sPeP-Uh-yMaAzWTVy-4k8Mc",
             .lazy = true,
         },
         .freetype = .{
@@ -17,8 +17,8 @@
             .hash = "harfbuzz-14.1.0-Ip1VAuGZAAC1jdxPHOMPoHyi-50Hm_q4bveaVflELHGw",
         },
         .sdl = .{
-            .url = "git+https://github.com/castholm/SDL#fb2d799c4778832a34ccb3739e40dded700684bd",
-            .hash = "sdl-0.5.3+3.4.14-SDL--v4eqAGuIKFsspMVxBxZf1OIEmmH-yHDdEl9ZRdX",
+            .url = "git+https://github.com/castholm/SDL?ref=v0.6.0+3.4.18#dbcb19aa3583c318556ecae3ecbeb29b102d37c5",
+            .hash = "sdl-0.6.0+3.4.18-SDL--p-gqAGWpnfTLlhs0dgjDtc4P4_CHeNLGY_SX_Fv",
             .lazy = true,
         },
         .sdl_image = .{

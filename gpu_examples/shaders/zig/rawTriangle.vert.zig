@@ -11,17 +11,17 @@ const color_out = @extern(
 );
 
 export fn main() callconv(.spirv_vertex) void {
-    switch (std.gpu.vertex_index) {
+    switch (std.spirv.vertex_index) {
         0 => {
-            std.gpu.position_out.* = .{ -1, -1, 0, 1 };
+            std.spirv.position_out.* = .{ -1, -1, 0, 1 };
             color_out.* = .{ 1, 0, 0, 1 };
         },
         1 => {
-            std.gpu.position_out.* = .{ 1, -1, 0, 1 };
+            std.spirv.position_out.* = .{ 1, -1, 0, 1 };
             color_out.* = .{ 0, 1, 0, 1 };
         },
         else => {
-            std.gpu.position_out.* = .{ 0, 1, 0, 1 };
+            std.spirv.position_out.* = .{ 0, 1, 0, 1 };
             color_out.* = .{ 0, 0, 1, 1 };
         },
     }

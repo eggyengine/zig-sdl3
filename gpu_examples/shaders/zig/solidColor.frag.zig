@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const color_in = @extern(
-    *addrspace(.input) @Vector(4, f32),
+    *addrspace(.input) const @Vector(4, f32),
     .{
         .name = "color",
         .decoration = .{
@@ -20,6 +20,6 @@ const color_out = @extern(
     },
 );
 
-export fn main() callconv(.spirv_fragment) void {
+export fn main() callconv(.{ .spirv_fragment = .{} }) void {
     color_out.* = color_in.*;
 }

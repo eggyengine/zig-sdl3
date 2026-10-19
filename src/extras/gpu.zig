@@ -190,9 +190,9 @@ pub fn loadComputePipelineEmbeddedWithMetadata(
     compute_kernel: anytype,
 ) !gpu.ComputePipeline {
     var compute_kernels = std.EnumMap(ShaderFormat, []const u8){};
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@hasDecl(compute_kernel, field.name))
-            compute_kernels.put(comptime std.meta.stringToEnum(ShaderFormat, field.name).?, @field(compute_kernel, field.name).data);
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |name| {
+        if (@hasDecl(compute_kernel, name))
+            compute_kernels.put(comptime std.meta.stringToEnum(ShaderFormat, name).?, @field(compute_kernel, name).data);
     }
     return loadComputePipelineWithMetadata(
         device,
@@ -347,9 +347,9 @@ pub fn loadGraphicsShaderEmbeddedWithMetadata(
     shader: anytype,
 ) !gpu.Shader {
     var shaders = std.EnumMap(ShaderFormat, []const u8){};
-    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".fields) |field| {
-        if (@hasDecl(shader, field.name))
-            shaders.put(comptime std.meta.stringToEnum(ShaderFormat, field.name).?, @field(shader, field.name).data);
+    inline for (@typeInfo(gpu.ShaderFormatFlags).@"struct".field_names) |name| {
+        if (@hasDecl(shader, name))
+            shaders.put(comptime std.meta.stringToEnum(ShaderFormat, name).?, @field(shader, name).data);
     }
     return loadGraphicsShaderWithMetadata(
         device,
