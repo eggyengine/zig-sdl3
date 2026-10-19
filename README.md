@@ -29,7 +29,7 @@ The master branch of zig is not currently supported.
 Choose the command that matches your desired zig-sdl3 version and run it in your project's root directory:
 * For the latest tagged release:
 ```sh
-zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.2.2
+zig fetch --save git+https://codeberg.org/7Games/zig-sdl3#v0.2.3
 ```
 * For in progress updates (nightly):
 ```sh
