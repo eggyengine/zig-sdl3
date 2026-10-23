@@ -189,6 +189,7 @@ pub fn prepareSdl(
             .lto = cfg.c_sdl_lto,
             .emscripten_pthreads = cfg.c_sdl_emscripten_pthreads,
             .install_build_config_h = cfg.c_sdl_install_build_config_h,
+            .system_include_path = cfg.sdl_system_include_path,
         });
         const lib = sdl_dep.artifact("SDL3");
         if (cfg.sdl_system_include_path) |val|
