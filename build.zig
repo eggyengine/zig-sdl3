@@ -36,6 +36,10 @@ const examples = [_][]const u8{
 pub const SdlConfig = struct {
     /// If to use the system's SDL include path.
     sdl_system_include_path: ?std.Build.LazyPath = null,
+    /// System framework path for SDL; with the next two, needed to cross-compile for macOS.
+    sdl_system_framework_path: ?std.Build.LazyPath = null,
+    /// System library path for SDL.
+    sdl_library_path: ?std.Build.LazyPath = null,
     /// Link system SDL instead of compiling our own.
     system_sdl: bool = false,
     /// Max stack size available for log messages.
@@ -190,6 +194,8 @@ pub fn prepareSdl(
             .emscripten_pthreads = cfg.c_sdl_emscripten_pthreads,
             .install_build_config_h = cfg.c_sdl_install_build_config_h,
             .system_include_path = cfg.sdl_system_include_path,
+            .system_framework_path = cfg.sdl_system_framework_path,
+            .library_path = cfg.sdl_library_path,
         });
         const lib = sdl_dep.artifact("SDL3");
         if (cfg.sdl_system_include_path) |val|
@@ -239,6 +245,8 @@ pub fn build(
     const c_sdl_emscripten_pthreads = b.option(bool, "c_sdl_emscripten_pthreads", "Build with pthreads support when targeting Emscripten (default: false)") orelse false;
     const c_sdl_install_build_config_h = b.option(bool, "c_sdl_install_build_config_h", "Additionally install 'SDL_build_config.h' when installing SDL (default: false)") orelse false;
     const sdl_system_include_path = b.option(std.Build.LazyPath, "sdl_system_include_path", "System include path for SDL");
+    const sdl_system_framework_path = b.option(std.Build.LazyPath, "sdl_system_framework_path", "System framework path for SDL");
+    const sdl_library_path = b.option(std.Build.LazyPath, "sdl_library_path", "System library path for SDL");
 
     const system_sdl = b.systemIntegrationOption("sdl", .{});
 
@@ -311,6 +319,8 @@ pub fn build(
         .renderer_debug_text_stack_size = renderer_debug_text_stack_size,
         .sdl3_main = sdl3_main,
         .sdl_system_include_path = sdl_system_include_path,
+        .sdl_system_framework_path = sdl_system_framework_path,
+        .sdl_library_path = sdl_library_path,
         .system_sdl = system_sdl,
     };
     _ = try prepareSdl(b, sdl_config, target, optimize, true);
